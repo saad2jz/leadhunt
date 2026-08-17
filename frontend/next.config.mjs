@@ -5,6 +5,7 @@ const nextConfig = {
   ...(isGitHubPages && {
     output: 'export',
     basePath: '/leadhunt',
+    trailingSlash: true,
   }),
   images: {
     unoptimized: true,

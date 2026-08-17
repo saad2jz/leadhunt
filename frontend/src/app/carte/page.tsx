@@ -32,7 +32,7 @@ export default function CartePage() {
   useEffect(() => {
     fetch('/api/prospects')
       .then(r => r.json())
-      .then(data => setProspects(Array.isArray(data) ? data : []))
+      .then(data => setProspects(data && Array.isArray(data.prospects) ? data.prospects : []))
       .catch(() => setProspects([]));
   }, []);
 

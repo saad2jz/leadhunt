@@ -240,6 +240,35 @@ function handleMockRoute(url: string, init?: RequestInit): any {
   const setItems = (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data));
 
   switch (path) {
+    case 'auth/session': {
+      return {
+        user: {
+          name: 'Jean Commercial',
+          email: 'jean@leadhunt.io',
+          role: 'SuperAdmin',
+          plan: 'business',
+          modulesActifs: ['prospection', 'crm', 'carte', 'autonomie', 'enrichissement', 'sequences', 'telephonie']
+        },
+        expires: '2036-08-18T00:00:00.000Z'
+      };
+    }
+
+    case 'auth/csrf': {
+      return { csrfToken: 'mock-csrf-token' };
+    }
+
+    case 'auth/providers': {
+      return {
+        credentials: {
+          id: 'credentials',
+          name: 'Credentials',
+          type: 'credentials',
+          signinUrl: '/api/auth/signin/credentials',
+          callbackUrl: '/api/auth/callback/credentials'
+        }
+      };
+    }
+
     case 'dashboard/stats': {
       const prospects = getItems(STORAGE_KEYS.PROSPECTS);
       const relances = getItems(STORAGE_KEYS.CAMPAIGN_RELANCES);
