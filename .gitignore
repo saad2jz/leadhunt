@@ -1,0 +1,15 @@
+node_modules/
+**/node_modules/
+.next/
+**/dist/
+**/.expo/
+**/web-build/
+.env
+.env.*
+!.env.example
+firebase-debug.log
+.gemini/
+**/.gemini/
+.agents/
+work/
+**/work/

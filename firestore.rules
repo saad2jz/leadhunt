@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function ownsSearch(searchId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/searches/$(searchId)).data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'photoURL', 'updatedAt']);
+      allow delete: if false;
+
+      match /{document=**} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow write: if false;
+      }
+    }
+
+    match /searches/{searchId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
+
+      match /{document=**} {
+        allow read: if ownsSearch(searchId);
+        allow write: if false;
+      }
+    }
+
+    match /companiesCache/{companyId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Les compteurs de coûts ne sont accessibles qu'aux Functions via Admin SDK.
+    match /apiUsage/{apiName} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}
+
