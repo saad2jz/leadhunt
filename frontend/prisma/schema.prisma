@@ -1,0 +1,639 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organisation {
+  id            String   @id @default(cuid())
+  nom           String
+  plan          String   @default("starter") // "starter", "pro", "business", "entreprise"
+  modulesActifs String   // JSON.stringify des modules activés, ex: ["prospection","pipeline","dashboard"]
+  createdAt     DateTime @default(now())
+  
+  utilisateurs      Utilisateur[]
+  prospects         Prospect[]
+  campagnes         Campagne[]
+  etapes            Etape[]
+  prospectCampagnes ProspectCampagne[]
+  listesNoires      ListeNoirContact[]
+  onboarding        OnboardingOrganisation?
+  usagesAPI         UsageAPI[]
+  recherches        RechercheProspection[]
+  icps              ICPDecouvert[]
+  interactions      Interaction[]
+  templatesEmail    TemplateEmail[]
+  emailsEnvoyes     EmailEnvoye[]
+  boitesMailOutreach BoiteMailOutreach[]
+  sequencesEmail    SequenceEmail[]
+  appels            Appel[]
+  alertesVeille     AlerteVeille[]
+  nouvellesEntreprises NouvelleEntrepriseDetectee[]
+  vuesSauvegardees  VueSauvegardee[]
+  parametresAutonomie ParametresAutonomie?
+  optimisationsCampagne OptimisationCampagne[]
+  connexionsCRM     ConnexionCRM[]
+  devis             Devis[]
+  leadsEntrants     LeadEntrant[]
+  reglesRoutage     RegleRoutage[]
+  conversationsAgent ConversationAgent[]
+}
+
+model PlanTarifaire {
+  id                         String   @id @default(cuid())
+  nom                        String   @unique // "starter", "pro", "business", "entreprise"
+  modulesInclus              Json     // liste des modules activés par défaut
+  quotaEnrichissementMensuel Int?     // nb d'enrichissements waterfall inclus, null = illimité
+  clesAPIPersonnelles        Boolean  @default(false)
+  prixMensuel                Float?
+}
+
+model Utilisateur {
+  id               String       @id @default(cuid())
+  email            String       @unique
+  passwordHash     String
+  role             String       @default("Commercial") // "Commercial", "Manager", "SuperAdmin"
+  organisationId   String
+  organisation     Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  twoFactorSecret  String?
+  lienCalCom       String?
+  createdAt        DateTime     @default(now())
+  assigneProspects Prospect[]   @relation(name: "AssigneProspects")
+  appels           Appel[]
+  leadsEntrants    LeadEntrant[]
+}
+
+model Prospect {
+  id                String             @id @default(cuid())
+  organisationId    String
+  organisation      Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nom               String
+  siren             String?
+  formeJuridique    String?
+  adresse           String?
+  ville             String?
+  departement       String?
+  codeNaf           String?
+  secteur           String?
+  categorie         String?
+  dirigeant         String?
+  effectif          String?
+  telephone         String?
+  telephoneVerifie  Boolean            @default(false)
+  email             String?
+  emailVerifie      Boolean            @default(false)
+  siteWeb           String?
+  siteVerifie       Boolean            @default(false)
+  statut            String             @default("À appeler")
+  assigneAId        String?
+  assigneA          Utilisateur?       @relation(name: "AssigneProspects", fields: [assigneAId], references: [id])
+  note              Int                @default(0) // 1 à 5 étoiles
+  score             Int                @default(0)
+  latitude          Float?
+  longitude         Float?
+  idExterneCRM      String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  contacts          Contact[]
+  interactions      Interaction[]
+  prospectCampagnes ProspectCampagne[]
+  emailsEnvoyes     EmailEnvoye[]
+  appels            Appel[]
+  sequences         ProspectSequence[]
+  signauxEmbauche   SignalEmbauche[]
+  synchroLogs       SynchroLog[]
+  devis             Devis[]
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  organisationId String
+  prospectId     String
+  prospect       Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  nom            String
+  fonction       String?      // Gérant, DAF, CTO, etc.
+  email          String?
+  telephone      String?
+  linkedinUrl    String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+}
+
+model Interaction {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  prospectId     String
+  prospect       Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  date           DateTime     @default(now())
+  type           String       // Appel, Email, LinkedIn, RDV
+  resultat       String?      // Répondu, Répondeur, Envoyé, etc.
+  notes          String?
+  analyseIA      AnalyseIA?
+}
+
+model ListeNoirContact {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  email          String?
+  telephone      String?
+  siren          String?
+  motif          String?      // "Demande RGPD", "Opposition démarchage", "Autre"
+  dateAjout      DateTime     @default(now())
+  ajoutePar      String?      // utilisateurId
+}
+
+model OnboardingOrganisation {
+  id                 String       @id @default(cuid())
+  organisationId     String       @unique
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  etapeActuelle      Int          @default(1)
+  reponsesDiagnostic String?      // JSON.stringify
+  planRecommande     String?
+  termine            Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+}
+
+model UsageAPI {
+  id             String        @id @default(cuid())
+  organisationId String?
+  organisation   Organisation? @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  apiName        String        // "pappers", "hunter", "apollo"
+  count          Int           @default(0)
+  limit          Int?
+  resetAt        DateTime
+}
+
+model Campagne {
+  id             String             @id @default(cuid())
+  nom            String
+  description    String?
+  organisationId String
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  etapes         Etape[]
+  prospects      ProspectCampagne[]
+  optimisations  OptimisationCampagne[]
+  createdAt      DateTime           @default(now())
+}
+
+model Etape {
+  id             String             @id @default(cuid())
+  organisationId String
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  campagneId     String
+  campagne       Campagne           @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  nom            String             // ex: Qualification, Premier contact...
+  ordre          Int                // position dans le pipeline (0, 1, 2...)
+  couleur        String?            // couleur Hex
+  prospects      ProspectCampagne[]
+  createdAt      DateTime           @default(now())
+}
+
+model ProspectCampagne {
+  id                String       @id @default(cuid())
+  organisationId    String
+  organisation      Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  prospectId        String
+  prospect          Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  campagneId        String
+  campagne          Campagne     @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  etapeId           String
+  etape             Etape        @relation(fields: [etapeId], references: [id], onDelete: Cascade)
+  dateEntreeEtape   DateTime     @default(now())
+  relanceProgrammee DateTime?
+  notes             String?
+  createdAt         DateTime     @default(now())
+}
+
+model RechercheProspection {
+  id             String             @id @default(cuid())
+  organisationId String
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  utilisateurId  String
+  entryType      String             // "entreprise" ou "motscles"
+  entryValue     String
+  besoin         Json               // details du besoin
+  statut         String             @default("en_attente") // en_attente, en_cours, terminee, erreur
+  createdAt      DateTime           @default(now())
+  
+  entreprises    EntrepriseTrouvee[]
+  buyerPersonas  BuyerPersona[]
+}
+
+model EntrepriseCache {
+  id           String              @id @default(cuid())
+  siren        String              @unique
+  nom          String
+  secteur      String?
+  effectif     String?
+  ville        String?
+  signauxBruts Json?
+  enrichieLe   DateTime            @default(now())
+  entreprises  EntrepriseTrouvee[]
+}
+
+model EntrepriseTrouvee {
+  id                String               @id @default(cuid())
+  rechercheId       String
+  recherche         RechercheProspection @relation(fields: [rechercheId], references: [id], onDelete: Cascade)
+  organisationId    String
+  entrepriseCacheId String?
+  entrepriseCache   EntrepriseCache?     @relation(fields: [entrepriseCacheId], references: [id])
+  nom               String
+  secteur           String?
+  effectif          String?
+  ville             String?
+  fitScore          Int                  @default(0)
+  fitDetail         Json?
+  timingScore       Int                  @default(0)
+  timingDetail      Json?
+  statutCRM         String               @default("nouveau") // nouveau, deja_en_pipe, exclu
+  prospectId        String?
+  createdAt         DateTime             @default(now())
+  
+  decideurs         DecideurTrouve[]
+  planApproche      PlanApproche?
+}
+
+model DecideurTrouve {
+  id                     String            @id @default(cuid())
+  organisationId         String
+  entrepriseTrouveeId    String
+  entrepriseTrouvee      EntrepriseTrouvee @relation(fields: [entrepriseTrouveeId], references: [id], onDelete: Cascade)
+  nom                    String?
+  fonction               String?
+  seniorite              String?
+  linkedinUrl            String?
+  emailTrouve            String?
+  emailStatutVerif       String?           // "verifie", "risque", "invalide", "non_teste"
+  emailProbabiliteBounce Float?
+  telephoneTrouve        String?
+  telephoneType          String?           // "mobile", "fixe"
+  telephoneActif         Boolean?
+  telephoneNomCorrespond Boolean?
+  confiance              String            @default("manuelle") // haute, moyenne, faible, manuelle
+  source                 String            @default("manuel")
+  fournisseursConsultes  Json?
+  verifieLe              DateTime?
+  createdAt              DateTime          @default(now())
+  
+  verifications          VerificationEmail[]
+}
+
+model BuyerPersona {
+  id             String               @id @default(cuid())
+  organisationId String
+  rechercheId    String
+  recherche      RechercheProspection @relation(fields: [rechercheId], references: [id], onDelete: Cascade)
+  roleTarget     String
+  motivations    Json
+  objections     Json
+  vocabulaire    Json
+  kpis           Json
+  createdAt      DateTime             @default(now())
+}
+
+model PlanApproche {
+  id                  String            @id @default(cuid())
+  organisationId      String
+  entrepriseTrouveeId String            @unique
+  entrepriseTrouvee   EntrepriseTrouvee @relation(fields: [entrepriseTrouveeId], references: [id], onDelete: Cascade)
+  canalRecommande     String
+  angleAccroche       String
+  etapesSequence      Json
+  messageDraft        String
+  createdAt          DateTime          @default(now())
+}
+
+model FeedbackScoring {
+  id                String   @id @default(cuid())
+  organisationId    String
+  utilisateurId     String
+  entiteId          String
+  typeEntite        String   // "entreprise" ou "decideur"
+  vote              String   // "pertinent" ou "pas_pertinent"
+  scoreDetailAuVote Json
+  createdAt         DateTime @default(now())
+}
+
+model PoidsScoring {
+  id             String   @id @default(cuid())
+  organisationId String
+  utilisateurId  String   @unique
+  poidsFit       Json
+  poidsTiming    Json
+  updatedAt      DateTime @updatedAt
+}
+
+model ICPDecouvert {
+  id                   String       @id @default(cuid())
+  organisationId       String
+  organisation         Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  domaineAnalyse       String
+  resumeActivite       String
+  concurrentsIdentifies Json
+  segmentsProposes     Json
+  besoinGenere         Json
+  createdAt            DateTime     @default(now())
+}
+
+model FournisseurEnrichissement {
+  id             String  @id @default(cuid())
+  nom            String  @unique // "hunter", "apollo", etc.
+  typeDonnee     String  // "email", "telephone", "les_deux"
+  ordrePriorite  Int
+  zonesGeoFortes Json?
+  actif          Boolean @default(true)
+}
+
+model VerificationEmail {
+  id             String         @id @default(cuid())
+  organisationId String
+  decideurId     String
+  decideur       DecideurTrouve @relation(fields: [decideurId], references: [id], onDelete: Cascade)
+  moteur         String
+  resultat       String
+  createdAt      DateTime       @default(now())
+}
+
+model TemplateEmail {
+  id             String          @id @default(cuid())
+  organisationId String
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nom            String
+  objet          String
+  corps          String
+  etapes         EtapeSequence[]
+  createdAt      DateTime        @default(now())
+}
+
+model EmailEnvoye {
+  id                String        @id @default(cuid())
+  organisationId    String
+  organisation      Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  prospectId        String
+  prospect          Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  contactId         String?
+  templateId        String?
+  objet             String
+  corps             String
+  statut            String        @default("envoyé") // "envoyé", "ouvert", "cliqué", "bounced", "échec"
+  dateEnvoi         DateTime      @default(now())
+  dateOuverture     DateTime?
+  dateClic          DateTime?
+  idProviderExterne String?
+}
+
+model BoiteMailOutreach {
+  id                     String       @id @default(cuid())
+  organisationId         String
+  organisation           Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  adresseEmail           String       @unique
+  domaine                String
+  statutChauffage        String       @default("en_chauffage") // "en_chauffage", "pret", "en_pause"
+  scoreReputation        Int?         @default(100)
+  dateDebutChauffage     DateTime     @default(now())
+  volumeJournalierActuel Int          @default(0)
+  volumeJournalierMax    Int          @default(5)
+}
+
+model SequenceEmail {
+  id             String          @id @default(cuid())
+  organisationId String
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nom            String
+  actif          Boolean         @default(true)
+  etapes         EtapeSequence[]
+  prospects      ProspectSequence[]
+  createdAt      DateTime        @default(now())
+}
+
+model EtapeSequence {
+  id            String        @id @default(cuid())
+  sequenceId    String
+  sequence      SequenceEmail @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  ordre         Int
+  delaiJours    Int           // ex: 0, 3, 7
+  templateId    String
+  template      TemplateEmail @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  condition     String        @default("toujours") // "toujours", "si_pas_de_reponse"
+}
+
+model ProspectSequence {
+  id             String        @id @default(cuid())
+  organisationId String
+  prospectId     String
+  prospect       Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  sequenceId     String
+  sequence       SequenceEmail @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  etapeActuelle  Int           @default(0)
+  dateDebut      DateTime      @default(now())
+  statut         String        @default("en cours") // "en cours", "terminée", "arrêtée"
+  prochainEnvoi  DateTime?
+}
+
+model Appel {
+  id                String       @id @default(cuid())
+  organisationId    String
+  organisation      Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  prospectId        String
+  prospect          Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  utilisateurId     String
+  utilisateur       Utilisateur  @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  numeroAppele      String
+  dureeSecondes     Int?
+  statut            String       // "en cours", "terminé", "manqué", "occupé"
+  enregistrementUrl String?
+  dateAppel     DateTime     @default(now())
+  idProviderExterne String?
+}
+
+model AlerteVeille {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nom            String
+  codeNaf        String?
+  departement    String?
+  formeJuridique String?
+  frequence      String       @default("quotidienne")
+  derniereExecution DateTime?
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  entreprises    NouvelleEntrepriseDetectee[]
+}
+
+model NouvelleEntrepriseDetectee {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  alerteId       String
+  alerte         AlerteVeille @relation(fields: [alerteId], references: [id], onDelete: Cascade)
+  siren          String
+  nom            String
+  dateCreation   DateTime
+  statut         String       @default("Nouvelle") // "Nouvelle", "Vue", "Importée"
+  createdAt      DateTime     @default(now())
+}
+
+model VueSauvegardee {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nom            String
+  filtres        String       // JSON string
+  createdAt      DateTime     @default(now())
+}
+
+model AnalyseIA {
+  id                String      @id @default(cuid())
+  organisationId    String
+  interactionId     String      @unique
+  interaction       Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  resume            String?
+  intentionDetectee String?     // "Chaud", "Tiède", "Froid"
+  actionSuggeree    String?
+  createdAt         DateTime    @default(now())
+}
+
+model SignalEmbauche {
+  id            String   @id @default(cuid())
+  organisationId String
+  prospectId    String
+  prospect      Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  titrePoste    String
+  urlOffre      String?
+  dateDetection DateTime @default(now())
+  actif         Boolean  @default(true)
+}
+
+model ParametresAutonomie {
+  id                    String       @id @default(cuid())
+  organisationId        String       @unique
+  organisation          Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  reponseAutonomeActive Boolean      @default(false)
+  bookingAutonomeActive Boolean      @default(false)
+  seuilConfianceMin     Int          @default(85)
+  updatedAt             DateTime     @updatedAt
+}
+
+model OptimisationCampagne {
+  id                String   @id @default(cuid())
+  organisationId    String
+  organisation      Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  campagneId        String
+  campagne          Campagne @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  segment           String
+  coutParLead       Float
+  statut            String   @default("en_test") // "en_test", "scaling", "en_pause"
+  derniereEvaluation DateTime @default(now())
+}
+
+model ConnexionCRM {
+  id            String       @id @default(cuid())
+  organisationId String
+  organisation  Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  fournisseur   String       // "hubspot", "pipedrive", "webhook"
+  apiKey        String?
+  baseUrl       String?
+  mappingChamps String       // JSON string
+  actif         Boolean      @default(true)
+  derniereSynchro DateTime?
+  createdAt     DateTime     @default(now())
+  logs          SynchroLog[]
+}
+
+model SynchroLog {
+  id             String       @id @default(cuid())
+  organisationId String
+  connexionId    String
+  connexion      ConnexionCRM @relation(fields: [connexionId], references: [id], onDelete: Cascade)
+  prospectId     String
+  prospect       Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  statut         String       // "succès", "échec"
+  message        String?
+  createdAt      DateTime     @default(now())
+}
+
+model Devis {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  prospectId     String
+  prospect       Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  numero         String       @unique
+  statut         String       @default("brouillon") // brouillon, envoyé, accepté, refusé
+  montantHT      Float
+  montantTTC     Float
+  tauxTVA        Float        @default(20)
+  dateCreation   DateTime     @default(now())
+  dateValidite   DateTime?
+  pdfUrl         String?
+  lignes         LigneDevis[]
+}
+
+model LigneDevis {
+  id           String       @id @default(cuid())
+  devisId      String
+  devis        Devis        @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  description  String
+  quantite     Float
+  prixUnitaire Float
+  ordre        Int
+}
+
+model LeadEntrant {
+  id                 String       @id @default(cuid())
+  organisationId     String
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  prospectId         String?
+  source             String       // "formulaire_site", "pub_meta", "chatbot", "whatsapp"
+  nom                String?
+  email              String?
+  telephone          String?
+  entreprise         String?
+  reponsesFormulaire String?      // JSON string
+  scoreQualification Int          @default(0)
+  statutIntake       String       @default("nouveau") // nouveau, qualifié, disqualifié, routé
+  assigneAId         String?
+  assigneA           Utilisateur? @relation(fields: [assigneAId], references: [id], onDelete: SetNull)
+  createdAt          DateTime     @default(now())
+}
+
+model RegleRoutage {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  nom            String
+  condition      String       // JSON string
+  assigneAId     String
+  ordre          Int
+  actif          Boolean      @default(true)
+}
+
+model ConversationAgent {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  utilisateurId  String
+  canal          String       @default("app")
+  messages       String       // JSON string
+  createdAt      DateTime     @default(now())
+  actions        ActionAgent[]
+}
+
+model ActionAgent {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   ConversationAgent @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  typeAction     String            // "recherche_entreprise", "creer_sequence", "envoyer_email"
+  parametres     String            // JSON string
+  statut         String            @default("proposée") // proposée, validée, exécutée, refusée
+  resultat       String?
+  createdAt      DateTime          @default(now())
+}

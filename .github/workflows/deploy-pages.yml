@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps
+
+      # Move API routes aside — they require a Node server and
+      # cannot be statically exported.  The UI pages still render.
+      - name: Exclude server-only routes from static export
+        working-directory: frontend
+        run: mv src/app/api src/app/_api_backup
+
+      - name: Build static export
+        working-directory: frontend
+        env:
+          GITHUB_PAGES: 'true'
+          # Dummy values so Prisma/NextAuth imports don't crash at build time
+          DATABASE_URL: 'postgresql://placeholder:placeholder@localhost:5432/placeholder'
+          NEXTAUTH_SECRET: 'build-time-placeholder'
+          NEXTAUTH_URL: 'https://saad2jz.github.io/leadhunt'
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
