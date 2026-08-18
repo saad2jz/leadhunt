@@ -728,18 +728,71 @@ function handleMockRoute(url: string, init?: RequestInit): any {
     }
 
     case 'icp/decouvrir': {
-      const siteUrl = body.siteUrl || 'https://luko.eu';
-      const host = siteUrl.replace('https://', '').replace('http://', '').replace('www.', '').split('/')[0];
+      const siteUrl = body.siteUrl || '';
+      const host = siteUrl.replace('https://', '').replace('http://', '').replace('www.', '').split('/')[0].toLowerCase();
       const companyKey = host.split('.')[0] || 'entreprise';
 
-      let resumeActivite = '';
-      let concurrentsIdentifies: string[] = [];
-      let segmentsProposes: any[] = [];
-      let besoinGenere: any = {};
+      // Industry detection based on domain keywords
+      const kw = companyKey + ' ' + host;
 
-      if (companyKey.includes('luko') || companyKey.includes('alan') || companyKey.includes('insurance')) {
-        resumeActivite = "Plateforme d'assurance digitale B2B et B2C, simplifiant la couverture des risques professionnels, de santé et d'habitation avec une expérience utilisateur fluide.";
-        concurrentsIdentifies = ['wakam.com', 'seyna.eu', 'yolo-insurance.com'];
+      const isFood = /aperi|traiteur|restau|boulan|biscuit|charcut|fromagerie|vins?|biere|brasserie|alimentation|epicerie|cafe|bar|pastry|gastrono|chocolat|fruits?|legum|boucher|poissonnier/i.test(kw);
+      const isBTP = /batiment|btp|construction|charpente|maconnerie|plomberie|electricien|toiture|renovation|architecture|immobi|agenceimmo|promoteur|terrassement|isolation|genie.civil/i.test(kw);
+      const isLogiciel = /saas|tech|software|logiciel|digital|app|dev|code|ia|ai|data|cloud|cyber|erp|crm|fintech|edtech|hrtech/i.test(kw);
+      const isConseil = /conseil|consult|cabinet|audit|expertise|strateg|rh|drh|management|finance|compta|juridique|notaire|avocat/i.test(kw);
+      const isIndustrie = /industrie|manufacturing|usine|production|machine|meca|metal|acier|aluminium|forge|fonderie|packaging|pharma|chimie|energie|petrole|agri/i.test(kw);
+      const isSante = /sante|medical|clinic|hopital|pharmaci|optique|dentist|kine|infirm|paramedical|maison.de.retraite|ehpad/i.test(kw);
+      const isCommerce = /retail|commerce|boutique|mode|fashion|sport|luxe|bijou|cosmet|beaute|coiffure|esthetique|magasin|enseigne|distribution|franchise/i.test(kw);
+      const isTransport = /transport|logistique|livraison|colis|fret|camion|flotte|transitaire|expediteur|import|export/i.test(kw);
+      const isMarketing = /agence|marketing|communication|publicite|design|graphisme|redaction|seo|social.media|influence|evenement|relations.presse/i.test(kw);
+      const isFormation = /formation|ecole|universite|apprentissage|elearning|coaching|cpf|organisme.de.formation|bilan.competence/i.test(kw);
+      const isAssurance = /assurance|assur|insurance|prevoyance|mutuelle|courtier/i.test(kw);
+
+      let resumeActivite: string;
+      let concurrentsIdentifies: string[];
+      let segmentsProposes: any[];
+      let besoinGenere: any;
+
+      if (isFood) {
+        resumeActivite = `Entreprise agroalimentaire ou de restauration (${companyKey.toUpperCase()}) proposant des produits ou services gastronomiques à destination des professionnels du secteur HCR (Hôtels, Cafés, Restaurants) et de la grande distribution.`;
+        concurrentsIdentifies = ['metro.fr', 'promocash.com', 'sysco.fr'];
+        segmentsProposes = [
+          { nom: 'Restaurateurs et traiteurs indépendants', score: 94 },
+          { nom: 'Chaînes de restauration et franchises', score: 88 },
+          { nom: 'Grande distribution et épiceries fines', score: 78 }
+        ];
+        besoinGenere = {
+          solutionType: 'Distribution alimentaire & HCR B2B',
+          tailleMin: 1,
+          tailleMax: 50,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['56.10A', '56.29A', '47.11D'],
+          budgetType: 'Standard',
+          signauxAchat: ['recrutement', 'refonte_site'],
+          rolesDecideurs: ['Gérant', 'Responsable achats', 'Chef de cuisine', 'Directeur de restaurant'],
+          maxEntitesIA: 5,
+        };
+      } else if (isBTP) {
+        resumeActivite = `Entreprise du secteur BTP/Construction (${companyKey.toUpperCase()}) proposant des prestations de construction, rénovation ou services techniques à destination des maîtres d'ouvrage, promoteurs et collectivités.`;
+        concurrentsIdentifies = ['eiffage.com', 'vinci.com', 'bouygues-construction.fr'];
+        segmentsProposes = [
+          { nom: 'Promoteurs immobiliers et aménageurs', score: 92 },
+          { nom: 'Syndics et gestionnaires de patrimoine', score: 85 },
+          { nom: 'Collectivités locales et établissements publics', score: 80 }
+        ];
+        besoinGenere = {
+          solutionType: 'Travaux & Services BTP',
+          tailleMin: 5,
+          tailleMax: 200,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['41.10A', '42.11Z', '43.22A'],
+          budgetType: 'Moyen',
+          signauxAchat: ['levees_fonds', 'recrutement'],
+          rolesDecideurs: ['Directeur de programme', 'Maître d\'ouvrage', 'Responsable technique', 'DAF'],
+          maxEntitesIA: 5,
+        };
+      } else if (isAssurance) {
+        resumeActivite = `Plateforme ou courtier en assurance (${companyKey.toUpperCase()}) offrant des solutions de prévoyance, assurance santé, habitation ou RC Pro adaptées aux professionnels et particuliers.`;
+        concurrentsIdentifies = ['wakam.com', 'seyna.eu', 'april.fr'];
         segmentsProposes = [
           { nom: 'Courtiers en assurance indépendants', score: 92 },
           { nom: 'Agences immobilières et syndics', score: 85 },
@@ -747,50 +800,176 @@ function handleMockRoute(url: string, init?: RequestInit): any {
         ];
         besoinGenere = {
           solutionType: 'Assurance & Prévoyance B2B',
-          tailleMin: 10,
-          tailleMax: 250,
+          tailleMin: 10, tailleMax: 250,
           zonesGeo: ['Île-de-France', 'Auvergne-Rhône-Alpes'],
-          secteurs: ['Logiciel', 'Assurance'],
+          secteurs: ['66.22Z', '68.31Z', '62.01Z'],
           budgetType: 'Moyen',
           signauxAchat: ['recrutement', 'levees_fonds'],
-          rolesDecideurs: ['Gérant', 'CTO', 'Responsable achats'],
+          rolesDecideurs: ['Gérant', 'DAF', 'Responsable achats'],
           maxEntitesIA: 5,
         };
-      } else if (companyKey.includes('leadhunt') || companyKey.includes('saad2jz')) {
-        resumeActivite = "Logiciel B2B SaaS d'intelligence commerciale, automatisation de la prospection, enrichissement de données décideurs en cascade et séquences froides multicanales.";
-        concurrentsIdentifies = ['kaspr.io', 'lemlist.com', 'lusha.com'];
+      } else if (isIndustrie) {
+        resumeActivite = `Acteur industriel ou manufacturier (${companyKey.toUpperCase()}) spécialisé dans la production ou la transformation de matériaux et équipements à destination d'autres industriels et donneurs d'ordre.`;
+        concurrentsIdentifies = ['industrie.fr', 'siemens.fr', 'schneider-electric.fr'];
         segmentsProposes = [
-          { nom: 'Entreprises de Services du Numérique (ESN)', score: 94 },
-          { nom: 'Cabinets de Conseil B2B', score: 88 },
-          { nom: 'Startups Tech (SaaS)', score: 85 }
+          { nom: 'Sous-traitants et équipementiers industriels', score: 91 },
+          { nom: 'Distributeurs et négoces techniques', score: 84 },
+          { nom: 'Donneurs d\'ordre (ETI/grandes entreprises)', score: 80 }
         ];
         besoinGenere = {
-          solutionType: 'Prospection B2B & Lead Gen',
-          tailleMin: 5,
-          tailleMax: 100,
-          zonesGeo: ['Toute la France', 'Belgique', 'Suisse'],
-          secteurs: ['Logiciel', 'Conseil'],
+          solutionType: 'Equipements & Solutions Industrielles',
+          tailleMin: 20, tailleMax: 500,
+          zonesGeo: ['Toute la France', 'Belgique', 'Allemagne'],
+          secteurs: ['25.62Z', '28.22Z', '20.16Z'],
+          budgetType: 'Élevé',
+          signauxAchat: ['recrutement', 'levees_fonds'],
+          rolesDecideurs: ['Directeur technique', 'Responsable production', 'Directeur achats', 'DAF'],
+          maxEntitesIA: 5,
+        };
+      } else if (isSante) {
+        resumeActivite = `Acteur de la santé ou du médical (${companyKey.toUpperCase()}) proposant des soins, équipements ou solutions de bien-être à destination des professionnels de santé et établissements médicaux.`;
+        concurrentsIdentifies = ['doctolib.fr', 'maisondedocteurs.fr', 'vidal.fr'];
+        segmentsProposes = [
+          { nom: 'Cliniques et établissements de santé privés', score: 93 },
+          { nom: 'Cabinets libéraux (médecins, kiné, infirmiers)', score: 87 },
+          { nom: 'Pharmacies et para-pharmacies', score: 80 }
+        ];
+        besoinGenere = {
+          solutionType: 'Solutions de Santé & Médical',
+          tailleMin: 1, tailleMax: 100,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['86.10Z', '86.21Z', '47.73Z'],
           budgetType: 'Standard',
           signauxAchat: ['recrutement', 'levees_fonds'],
-          rolesDecideurs: ['Directeur Commercial', 'VP Sales', 'CEO', 'Gérant'],
+          rolesDecideurs: ['Directeur médical', 'Directeur d\'établissement', 'Responsable achats', 'Médecin associé'],
+          maxEntitesIA: 5,
+        };
+      } else if (isCommerce) {
+        resumeActivite = `Enseigne ou marque de commerce/retail (${companyKey.toUpperCase()}) distribuant des produits à destination des consommateurs finaux, franchisés ou revendeurs B2B.`;
+        concurrentsIdentifies = ['franprix.fr', 'franchisor.fr', 'retailconnect.fr'];
+        segmentsProposes = [
+          { nom: 'Franchisés et revendeurs multimarques', score: 90 },
+          { nom: 'Boutiques indépendantes et corners', score: 85 },
+          { nom: 'Centrale d\'achat et groupements', score: 78 }
+        ];
+        besoinGenere = {
+          solutionType: 'Distribution & Commerce de détail',
+          tailleMin: 1, tailleMax: 50,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['47.71Z', '47.19B', '47.91A'],
+          budgetType: 'Standard',
+          signauxAchat: ['refonte_site', 'recrutement'],
+          rolesDecideurs: ['Gérant', 'Responsable achats', 'Directeur commercial'],
+          maxEntitesIA: 5,
+        };
+      } else if (isTransport) {
+        resumeActivite = `Opérateur logistique ou de transport (${companyKey.toUpperCase()}) assurant l'acheminement et la distribution de marchandises B2B sur le territoire national et international.`;
+        concurrentsIdentifies = ['geodis.com', 'dhl.fr', 'tnt.fr'];
+        segmentsProposes = [
+          { nom: 'E-commerçants et marketplaces', score: 92 },
+          { nom: 'PME industrielles exportatrices', score: 87 },
+          { nom: 'Distributeurs et grossistes nationaux', score: 82 }
+        ];
+        besoinGenere = {
+          solutionType: 'Transport & Logistique B2B',
+          tailleMin: 5, tailleMax: 300,
+          zonesGeo: ['Toute la France', 'Europe'],
+          secteurs: ['49.41A', '52.10B', '46.90Z'],
+          budgetType: 'Moyen',
+          signauxAchat: ['recrutement', 'levees_fonds'],
+          rolesDecideurs: ['Directeur logistique', 'Responsable supply chain', 'DAF', 'Gérant'],
+          maxEntitesIA: 5,
+        };
+      } else if (isMarketing) {
+        resumeActivite = `Agence de communication, marketing ou design (${companyKey.toUpperCase()}) accompagnant des entreprises dans leur stratégie de marque, visibilité digitale et acquisition client.`;
+        concurrentsIdentifies = ['publicisgroupe.com', 'havas.com', 'ogilvy.fr'];
+        segmentsProposes = [
+          { nom: 'PME en croissance cherchant à accroître leur visibilité', score: 91 },
+          { nom: 'Startups et scale-ups (levées de fonds)', score: 88 },
+          { nom: 'ETI en transformation de marque', score: 82 }
+        ];
+        besoinGenere = {
+          solutionType: 'Marketing & Communication B2B',
+          tailleMin: 5, tailleMax: 250,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['73.11Z', '62.09Z', '74.10Z'],
+          budgetType: 'Standard',
+          signauxAchat: ['levees_fonds', 'refonte_site'],
+          rolesDecideurs: ['Directeur marketing', 'CMO', 'Directeur général', 'Gérant'],
+          maxEntitesIA: 5,
+        };
+      } else if (isFormation) {
+        resumeActivite = `Organisme de formation ou école (${companyKey.toUpperCase()}) proposant des parcours de montée en compétences, certifications et bilans à destination des salariés et professionnels.`;
+        concurrentsIdentifies = ['formaplace.fr', '360learning.com', 'crossknowledge.com'];
+        segmentsProposes = [
+          { nom: 'DRH et responsables formation en entreprise', score: 93 },
+          { nom: 'OPCO et organismes financeurs', score: 86 },
+          { nom: 'Indépendants et auto-entrepreneurs', score: 78 }
+        ];
+        besoinGenere = {
+          solutionType: 'Formation & Développement des compétences',
+          tailleMin: 10, tailleMax: 500,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['85.59B', '70.22Z', '62.02A'],
+          budgetType: 'Standard',
+          signauxAchat: ['recrutement'],
+          rolesDecideurs: ['DRH', 'Responsable formation', 'Directeur général', 'Manager'],
+          maxEntitesIA: 5,
+        };
+      } else if (isConseil) {
+        resumeActivite = `Cabinet de conseil ou d'expertise (${companyKey.toUpperCase()}) proposant des prestations d'accompagnement stratégique, juridique, financier ou RH à destination des dirigeants de PME/ETI.`;
+        concurrentsIdentifies = ['mckinsey.fr', 'bain.fr', 'deloitte.fr'];
+        segmentsProposes = [
+          { nom: 'Dirigeants de PME en transformation', score: 90 },
+          { nom: 'DAF et directions financières d\'ETI', score: 86 },
+          { nom: 'Fonds d\'investissement et LBO', score: 80 }
+        ];
+        besoinGenere = {
+          solutionType: 'Conseil & Expertise B2B',
+          tailleMin: 10, tailleMax: 500,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['69.20Z', '70.22Z', '64.20Z'],
+          budgetType: 'Élevé',
+          signauxAchat: ['levees_fonds', 'recrutement'],
+          rolesDecideurs: ['DAF', 'Directeur général', 'Associé', 'Gérant'],
+          maxEntitesIA: 5,
+        };
+      } else if (isLogiciel) {
+        resumeActivite = `Éditeur de logiciel ou solution tech (${companyKey.toUpperCase()}) développant des outils SaaS, applications ou solutions IA pour accélérer la productivité et la transformation digitale des entreprises.`;
+        concurrentsIdentifies = [`alt-${companyKey}.io`, `${companyKey}-rival.fr`];
+        segmentsProposes = [
+          { nom: 'PME en cours de digitalisation', score: 92 },
+          { nom: 'ETI cherchant à moderniser leurs processus', score: 86 },
+          { nom: 'Startups et scale-ups en hyper-croissance', score: 84 }
+        ];
+        besoinGenere = {
+          solutionType: 'Logiciel SaaS B2B',
+          tailleMin: 10, tailleMax: 500,
+          zonesGeo: ['Toute la France', 'Belgique'],
+          secteurs: ['62.01Z', '62.02A', '63.11Z'],
+          budgetType: 'Standard',
+          signauxAchat: ['recrutement', 'levees_fonds'],
+          rolesDecideurs: ['CTO', 'DSI', 'Directeur général', 'Responsable IT'],
           maxEntitesIA: 5,
         };
       } else {
-        resumeActivite = `Solution technologique innovante développée par ${companyKey.toUpperCase()} pour optimiser les processus métiers B2B et accélérer la transformation digitale.`;
-        concurrentsIdentifies = [`direct-${companyKey}.com`, `alliance-${companyKey}.fr`];
+        // Fallback générique intelligent basé sur le nom du domaine
+        const label = companyKey.charAt(0).toUpperCase() + companyKey.slice(1);
+        resumeActivite = `${label} est une entreprise proposant des produits ou services à destination de clients professionnels. Son positionnement B2B lui permet de cibler des acheteurs spécialisés dans son domaine d'activité.`;
+        concurrentsIdentifies = [`${companyKey}-concurrent.fr`, `groupe-${companyKey}.com`];
         segmentsProposes = [
-          { nom: 'Sociétés de conseil et ESN', score: 88 },
-          { nom: 'Agences de communication et marketing', score: 82 }
+          { nom: 'PME et TPE du même secteur d\'activité', score: 88 },
+          { nom: 'Groupes et ETI régionaux', score: 82 },
+          { nom: 'Revendeurs et distributeurs spécialisés', score: 76 }
         ];
         besoinGenere = {
-          solutionType: 'Outils SaaS / Conseil B2B',
-          tailleMin: 10,
-          tailleMax: 100,
+          solutionType: `Produits & Services ${label}`,
+          tailleMin: 5, tailleMax: 200,
           zonesGeo: ['Toute la France'],
-          secteurs: ['Logiciel'],
-          budgetType: 'Moyen',
+          secteurs: ['70.22Z', '46.90Z', '74.90B'],
+          budgetType: 'Standard',
           signauxAchat: ['recrutement', 'refonte_site'],
-          rolesDecideurs: ['Directeur technique', 'CTO', 'Gérant'],
+          rolesDecideurs: ['Gérant', 'Directeur commercial', 'Responsable achats'],
           maxEntitesIA: 5,
         };
       }
