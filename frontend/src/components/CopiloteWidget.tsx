@@ -12,6 +12,7 @@ export default function CopiloteWidget() {
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -20,6 +21,60 @@ export default function CopiloteWidget() {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, loading]);
+
+  const SUGGESTIONS = [
+    { label: 'Recherche SIRENE', icon: '🔍', text: 'Lancer une recherche SIRENE' },
+    { label: 'Inscrire à une séquence', icon: '📋', text: 'Inscrire mes prospects à une séquence' },
+    { label: 'Consulter mes statistiques', icon: '📊', text: 'Voir mes statistiques CRM' },
+    { label: 'Envoyer des relances', icon: '✉️', text: 'Envoyer mes relances du jour' },
+  ];
+
+  const handleSelectSuggestion = async (text: string) => {
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setLoading(true);
+    if (text === 'Lancer une recherche SIRENE') {
+      setShowSuggestions(false);
+    }
+
+    try {
+      const res = await fetch('/api/ia/copilote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversationId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setConversationId(data.conversationId);
+        if (data.messages) {
+          setMessages(data.messages);
+          const lastMsg = data.messages[data.messages.length - 1];
+          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.includes('Quel secteur')) {
+            setShowSuggestions(false);
+          } else {
+            setShowSuggestions(true);
+          }
+        }
+        if (data.proposedAction) {
+          setMessages(prev => [
+            ...prev,
+            {
+              role: 'action_proposal',
+              actionId: data.proposedAction.id,
+              typeAction: data.proposedAction.typeAction,
+              parametres: JSON.parse(data.proposedAction.parametres || '{}'),
+            }
+          ]);
+        }
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: "Désolé, je rencontre des difficultés." }]);
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, { role: 'assistant', content: "Erreur de connexion." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +99,12 @@ export default function CopiloteWidget() {
         // Remplace les messages par l'historique complet
         if (data.messages) {
           setMessages(data.messages);
+          const lastMsg = data.messages[data.messages.length - 1];
+          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.includes('Quel secteur')) {
+            setShowSuggestions(false);
+          } else {
+            setShowSuggestions(true);
+          }
         }
 
         // Si une action est proposée, on l'ajoute comme élément spécial
@@ -84,6 +145,7 @@ export default function CopiloteWidget() {
           ...prev.filter(m => m.actionId !== actionId),
           { role: 'assistant', content: `✅ **Action exécutée** : ${data.resultat}` }
         ]);
+        setShowSuggestions(true);
       } else {
         alert("Erreur lors de l'exécution de l'action.");
       }
@@ -177,6 +239,20 @@ export default function CopiloteWidget() {
                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce delay-75" />
                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce delay-150" />
                 </div>
+              </div>
+            {!loading && showSuggestions && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {SUGGESTIONS.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(s.text)}
+                    className="px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/20 text-slate-300 hover:text-white transition-all text-[10px] font-medium shadow-sm flex items-center gap-1.5 text-left"
+                  >
+                    <span>{s.icon}</span>
+                    <span>{s.label}</span>
+                  </button>
+                ))}
               </div>
             )}
             <div ref={messagesEndRef} />

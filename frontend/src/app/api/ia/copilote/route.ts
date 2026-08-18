@@ -48,15 +48,23 @@ export async function POST(req: Request) {
     let responseText = '';
     let proposedAction: any = null;
 
-    // Analyse sémantique / routage NLP
-    const lowerMessage = message.toLowerCase();
+    // Check if previous message asked for a sector and we need to capture the text input
+    const wasAskedForSector = messagesList.length >= 3 && 
+      messagesList[messagesList.length - 2]?.role === 'assistant' && 
+      messagesList[messagesList.length - 2]?.content?.includes('Quel secteur');
 
-    if (lowerMessage.includes('recherche') || lowerMessage.includes('trouve') || lowerMessage.includes('sirene')) {
-      // Extrait des mots clés simples
-      let target = 'Logiciel';
+    if (lowerMessage === 'lancer une recherche sirene' || lowerMessage === 'recherche sirene') {
+      responseText = "Quel secteur d'activité ou mot-clé recherchez-vous ? Saisissez-le ci-dessous (ex: Restauration, BTP, Logiciel...) :";
+    } else if (wasAskedForSector || lowerMessage.includes('recherche') || lowerMessage.includes('trouve') || lowerMessage.includes('sirene')) {
+      let target = '';
       if (lowerMessage.includes('btp')) target = 'BTP';
-      else if (lowerMessage.includes('restaurant')) target = 'Restauration';
+      else if (lowerMessage.includes('restaurant') || lowerMessage.includes('restau')) target = 'Restauration';
       else if (lowerMessage.includes('coiffeur')) target = 'Coiffure';
+      else if (wasAskedForSector) {
+        target = message.trim();
+      } else {
+        target = 'Logiciel';
+      }
 
       responseText = `Je comprends que vous souhaitez sourcer de nouvelles entreprises dans le secteur : **${target}**. Je propose de lancer une recherche SIRENE ciblée.`;
       
