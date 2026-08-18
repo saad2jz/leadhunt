@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import { getPitchForSector } from '@/lib/pitch-templates';
 import { 
   Building, User, Mail, Phone, Calendar, Star, Edit3, Trash2, 
-  Plus, MessageSquare, AlertTriangle, Check, Upload, ArrowLeft, X, Layers, Cpu, ExternalLink, Link2, FileText
+  Plus, MessageSquare, AlertTriangle, Check, Upload, ArrowLeft, X, Layers, Cpu, ExternalLink, Link2, FileText, Compass
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
