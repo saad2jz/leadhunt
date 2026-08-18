@@ -769,6 +769,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['recrutement', 'refonte_site'],
           rolesDecideurs: ['Gérant', 'Responsable achats', 'Chef de cuisine', 'Directeur de restaurant'],
+          motsClesSuggeres: 'Restaurants indépendants, Traiteurs professionnels, Brasseries, Cafetérias entreprise, Restauration collective, Hôtels restaurants',
           maxEntitesIA: 5,
         };
       } else if (isBTP) {
@@ -788,6 +789,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Moyen',
           signauxAchat: ['levees_fonds', 'recrutement'],
           rolesDecideurs: ['Directeur de programme', 'Maître d\'ouvrage', 'Responsable technique', 'DAF'],
+          motsClesSuggeres: 'Promoteurs immobiliers, Agences immobilières, Bailleurs sociaux, Syndics de copropriété, Collectivités locales, Arquitectes maîtres d\'oeuvre',
           maxEntitesIA: 5,
         };
       } else if (isAssurance) {
@@ -806,6 +808,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Moyen',
           signauxAchat: ['recrutement', 'levees_fonds'],
           rolesDecideurs: ['Gérant', 'DAF', 'Responsable achats'],
+          motsClesSuggeres: 'Courtiers en assurance, Agents généraux AXA Allianz, Cabinets de gestion de patrimoine, Professions libérales RC Pro, Experts-comptables protection sociale',
           maxEntitesIA: 5,
         };
       } else if (isIndustrie) {
@@ -824,6 +827,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Élevé',
           signauxAchat: ['recrutement', 'levees_fonds'],
           rolesDecideurs: ['Directeur technique', 'Responsable production', 'Directeur achats', 'DAF'],
+          motsClesSuggeres: 'Sous-traitants aéronautique, Équipementiers automobile, Fonderies métallurgie, Industries plastiques emballage, Fabricants machines-outils, ETI manufacturières',
           maxEntitesIA: 5,
         };
       } else if (isSante) {
@@ -842,6 +846,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['recrutement', 'levees_fonds'],
           rolesDecideurs: ['Directeur médical', 'Directeur d\'établissement', 'Responsable achats', 'Médecin associé'],
+          motsClesSuggeres: 'Cliniques privées, Cabinets médicaux groupe, EHPAD maisons de retraite, Centres de rééducation kiné, Pharmacies indépendantes, Laboratoires analyses médicales',
           maxEntitesIA: 5,
         };
       } else if (isCommerce) {
@@ -860,6 +865,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['refonte_site', 'recrutement'],
           rolesDecideurs: ['Gérant', 'Responsable achats', 'Directeur commercial'],
+          motsClesSuggeres: 'Boutiques mode indépendantes, Franchisés enseégnes nationales, Concept stores, Showrooms mobilier, Distributeurs multimarques, Revendeurs BtoB spécialisés',
           maxEntitesIA: 5,
         };
       } else if (isTransport) {
@@ -878,6 +884,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Moyen',
           signauxAchat: ['recrutement', 'levees_fonds'],
           rolesDecideurs: ['Directeur logistique', 'Responsable supply chain', 'DAF', 'Gérant'],
+          motsClesSuggeres: 'E-commerçants grande échelle, PME industrielles exportatrices, Grossistes nationaux, Importateurs distributeurs, Plateformes e-commerce, Entreprises Amazon seller',
           maxEntitesIA: 5,
         };
       } else if (isMarketing) {
@@ -896,6 +903,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['levees_fonds', 'refonte_site'],
           rolesDecideurs: ['Directeur marketing', 'CMO', 'Directeur général', 'Gérant'],
+          motsClesSuggeres: 'Startups levée de fonds série A, PME rebranding identité, ETI lancement nouveau produit, Groupes refonte site corporate, Scale-ups équipe marketing croissante',
           maxEntitesIA: 5,
         };
       } else if (isFormation) {
@@ -914,6 +922,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['recrutement'],
           rolesDecideurs: ['DRH', 'Responsable formation', 'Directeur général', 'Manager'],
+          motsClesSuggeres: 'DRH entreprises 50-500 salariés, Cabinets de conseil plan formation, ETI secteur industriel, Services publics formation agents, Coopératives agricoles CPF, Groupes hôtellerie restauration',
           maxEntitesIA: 5,
         };
       } else if (isConseil) {
@@ -932,6 +941,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Élevé',
           signauxAchat: ['levees_fonds', 'recrutement'],
           rolesDecideurs: ['DAF', 'Directeur général', 'Associé', 'Gérant'],
+          motsClesSuggeres: 'PME en transformation organisationnelle, ETI projet ERP, Groupes fusion-acquisition, Directions financières restructuration, Fonds LBO portefeuille PME, Start-up gouvernance scale-up',
           maxEntitesIA: 5,
         };
       } else if (isLogiciel) {
@@ -950,6 +960,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['recrutement', 'levees_fonds'],
           rolesDecideurs: ['CTO', 'DSI', 'Directeur général', 'Responsable IT'],
+          motsClesSuggeres: 'PME digitalisées ERP cloud, ETI modernisation systèmes, Startups SaaS hyper-croissance, Groupes DSI sécurité informatique, Cabinets comptables logiciel gestion, ESN éditeurs partenaires',
           maxEntitesIA: 5,
         };
       } else {
@@ -970,6 +981,7 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           budgetType: 'Standard',
           signauxAchat: ['recrutement', 'refonte_site'],
           rolesDecideurs: ['Gérant', 'Directeur commercial', 'Responsable achats'],
+          motsClesSuggeres: `Entreprises du secteur ${label}, PME régionales en croissance, Dirigeants de TPE, Directeurs commerciaux B2B, Décideurs achats`,
           maxEntitesIA: 5,
         };
       }

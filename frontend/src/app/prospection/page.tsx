@@ -91,7 +91,11 @@ export default function ProspectionSearchPage() {
         setBudgetType(icp.besoinGenere.budgetType || 'Moyen');
         setSignauxAchat(icp.besoinGenere.signauxAchat || []);
         setRolesDecideurs(icp.besoinGenere.rolesDecideurs || []);
-        alert("ICP analysé avec succès ! Le formulaire a été pré-rempli.");
+        // Pré-remplir aussi le point d'entrée avec les mots-clés suggérés
+        if (icp.besoinGenere.motsClesSuggeres) {
+          setEntryType('motscles');
+          setEntryValue(icp.besoinGenere.motsClesSuggeres);
+        }
       } else {
         alert("Impossible d'analyser l'ICP de ce domaine.");
       }
