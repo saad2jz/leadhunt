@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   VEILLE: 'leadhunt_mock_veille',
   LEADS: 'leadhunt_mock_leads',
   INTERACTIONS: 'leadhunt_mock_interactions',
+  ORGANISATIONS: 'leadhunt_mock_organisations',
 };
 
 // Seed initial data if localStorage is empty
@@ -264,6 +265,30 @@ function seedDatabase() {
   getOrSet(STORAGE_KEYS.INTERACTIONS, [
     { id: 'i1', date: new Date().toISOString(), type: 'Email', notes: 'Séquence commencée', prospectId: 'p1' }
   ]);
+
+  // Seed Organisations
+  getOrSet(STORAGE_KEYS.ORGANISATIONS, [
+    {
+      id: 'org1',
+      nom: 'Leadhunt Startup',
+      plan: 'business',
+      modulesActifs: JSON.stringify(['prospection', 'crm', 'carte', 'autonomie', 'enrichissement', 'sequences', 'telephonie']),
+      createdAt: new Date().toISOString(),
+      utilisateurs: [
+        { id: 'u1', email: 'jean@leadhunt.io', role: 'SuperAdmin' }
+      ]
+    },
+    {
+      id: 'org2',
+      nom: 'Wayne Corporate',
+      plan: 'pro',
+      modulesActifs: JSON.stringify(['carte', 'crm']),
+      createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      utilisateurs: [
+        { id: 'u2', email: 'bruce@wayne.example.com', role: 'Manager' }
+      ]
+    }
+  ]);
 }
 
 // Hook Fetch requests
@@ -370,6 +395,25 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           callbackUrl: '/api/auth/callback/credentials'
         }
       };
+    }
+
+    case 'admin/organisations': {
+      const organisations = getItems(STORAGE_KEYS.ORGANISATIONS);
+      if (method === 'POST') {
+        const index = organisations.findIndex(o => o.id === body.id);
+        if (index > -1) {
+          organisations[index] = {
+            ...organisations[index],
+            nom: body.nom.trim(),
+            plan: body.plan,
+            modulesActifs: JSON.stringify(body.modulesActifs),
+          };
+          setItems(STORAGE_KEYS.ORGANISATIONS, organisations);
+          return { success: true, organisation: organisations[index] };
+        }
+        return { error: 'Organisation introuvable' };
+      }
+      return { organisations };
     }
 
     case 'dashboard/stats': {
