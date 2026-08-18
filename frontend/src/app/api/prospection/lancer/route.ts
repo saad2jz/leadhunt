@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getScopedPrisma } from '@/lib/auth-scope';
 import { enrichirDecideur } from '@/lib/waterfall';
+import { enrichirDecideursParIA } from '@/lib/gemini-client';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -33,35 +34,28 @@ export async function GET(req: Request) {
   const id = searchParams.get('id');
 
   if (!id) {
-    return NextResponse.json({ error: 'ID de recherche manquant.' }, { status: 400 });
+    return NextResponse.json({ error: 'ID manquant.' }, { status: 400 });
   }
 
-  try {
-    const scopedPrisma = getScopedPrisma(session);
-
-    const recherche = await scopedPrisma.rechercheProspection.findFirst({
-      where: { id },
-      include: {
-        entreprises: {
-          include: {
-            decideurs: true,
-            planApproche: true,
-          },
-          orderBy: { fitScore: 'desc' },
+  const scopedPrisma = getScopedPrisma(session);
+  const recherche = await scopedPrisma.rechercheProspection.findUnique({
+    where: { id },
+    include: {
+      entreprises: {
+        include: {
+          decideurs: true,
+          planApproche: true,
         },
-        buyerPersonas: true,
       },
-    });
+      buyerPersonas: true,
+    },
+  });
 
-    if (!recherche) {
-      return NextResponse.json({ error: 'Recherche introuvable.' }, { status: 404 });
-    }
-
-    return NextResponse.json({ recherche });
-  } catch (error) {
-    console.error('Erreur GET prospection status:', error);
-    return NextResponse.json({ error: 'Une erreur interne est survenue.' }, { status: 500 });
+  if (!recherche) {
+    return NextResponse.json({ error: 'Recherche introuvable.' }, { status: 404 });
   }
+
+  return NextResponse.json({ recherche });
 }
 
 // POST: Lance une nouvelle recherche
@@ -114,22 +108,55 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
   console.log(`[Recherche: ${rechercheId}] Démarrage du traitement en tâche de fond.`);
 
   try {
-    // Liste d'entreprises fictives à prospecter pour la démo de prospection
-    const mockCompanies = [
-      { nom: 'Alpha Services', siren: '123456789', secteur: '70.22Z', effectif: '45 salariés', ville: 'Paris', departement: '75', signal: 'recrutement' },
-      { nom: 'Beta Tech', siren: '987654321', secteur: '62.01Z', effectif: '85 salariés', ville: 'Lyon', departement: '69', signal: 'levees_fonds' },
-      { nom: 'Gamma Consulting', siren: '111222333', secteur: '70.22Z', effectif: '12 salariés', ville: 'Marseille', departement: '13', signal: 'refonte_site' },
-      { nom: 'Delta Immo', siren: '444555666', secteur: '68.31Z', effectif: '22 salariés', ville: 'Bordeaux', departement: '33', signal: 'recrutement' },
-      { nom: 'Epsilon Retail', siren: '777888999', secteur: '47.11D', effectif: '60 salariés', ville: 'Lille', departement: '59', signal: 'none' },
-    ];
+    // --- Vrai Appel API SIRENE ---
+    const secteurs: string[] = input.besoin.secteurs || [];
+    const nafCode = secteurs.find(s => s.includes('.')) || '';
+    const q = input.entryValue
+      ? input.entryValue.split(',')[0].trim()
+      : input.besoin.solutionType.split(' ')[0];
 
-    const targetCompanies = mockCompanies.filter(comp => {
-      // Filtrage simple pour rendre la simulation interactive
-      if (input.besoin.secteurs.length > 0 && !input.besoin.secteurs.includes(comp.secteur)) {
-        return Math.random() > 0.5; // garde aléatoirement si hors critères
+    let sirenResults: any[] = [];
+    try {
+      const params = new URLSearchParams();
+      if (q && q.length > 2) params.set('q', q);
+      if (nafCode) params.set('activite_principale', nafCode);
+      params.set('page', '1');
+      params.set('per_page', String(input.besoin.maxEntitesIA || 5));
+      params.set('etat_administratif', 'A');
+
+      const apiUrl = `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
+      const sirenRes = await fetch(apiUrl);
+      if (sirenRes.ok) {
+        const sirenData = await sirenRes.json();
+        sirenResults = sirenData.results || [];
       }
-      return true;
-    }).slice(0, input.besoin.maxEntitesIA);
+    } catch (sirenErr) {
+      console.error('[Backend Search] SIRENE API call failed:', sirenErr);
+    }
+
+    if (sirenResults.length === 0) {
+      console.warn('[Backend Search] Aucune entreprise trouvée dans SIRENE pour cette recherche.');
+      await prisma.rechercheProspection.update({
+        where: { id: rechercheId },
+        data: { statut: 'terminee' }
+      });
+      return;
+    }
+
+    // --- Vrai Appel d'Enrichissement Décideurs par Gemini IA ---
+    let iaEnrichment: Record<string, any> = {};
+    const roles: string[] = input.besoin.rolesDecideurs || ['Gérant', 'Directeur commercial'];
+    try {
+      const listToEnrich = sirenResults.map((r: any) => ({
+        siren: r.siren || '',
+        nom: r.nom_complet || r.nom_raison_sociale || '',
+        ville: r.siege?.libelle_commune || '',
+        naf: r.activite_principale || '',
+      }));
+      iaEnrichment = await enrichirDecideursParIA(listToEnrich, roles);
+    } catch (iaErr) {
+      console.error('[Backend Search] IA Enrichment failed:', iaErr);
+    }
 
     const fitPoids = 0.5; // ratios de scoring par défaut
     const timingPoids = 0.5;
@@ -142,7 +169,36 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
     const weightsFit = poidsRecord ? JSON.parse(poidsRecord.poidsFit as string) : { secteur: 30, taille: 25, geo: 20, decideur: 25 };
     const weightsTiming = poidsRecord ? JSON.parse(poidsRecord.poidsTiming as string) : { signal: 30, recrutement: 30, technique: 25, fraicheur: 15 };
 
-    // 1. Boucle de traitement sur chaque entreprise
+    // Mappage des entreprises réelles de SIRENE
+    const targetCompanies = sirenResults.map((et: any, idx: number) => {
+      const nom = et.nom_complet || et.nom_raison_sociale || `Entreprise ${idx + 1}`;
+      const siren = et.siren || '';
+      const nafCode2 = et.activite_principale || secteurs[0] || '70.22Z';
+      const villeRaw = et.siege?.libelle_commune || et.siege?.code_postal || 'France';
+      const ville = villeRaw.charAt(0).toUpperCase() + villeRaw.slice(1).toLowerCase();
+      const signal = input.besoin.signauxAchat[idx % input.besoin.signauxAchat.length] || 'recrutement';
+
+      let effectif = 'NC';
+      const tranche = et.tranche_effectif_salarie;
+      const effectifMap: Record<string, string> = {
+        '00': '0 salarié', '01': '1-2 salariés', '02': '3-5 salariés',
+        '03': '6-9 salariés', '11': '10-19 salariés', '12': '20-49 salariés',
+        '21': '50-99 salariés', '22': '100-199 salariés', '31': '200-499 salariés',
+        '32': '500-999 salariés', '41': '1000-1999 salariés', '42': '2000+ salariés',
+      };
+      if (tranche) effectif = effectifMap[tranche] || `Effectif ${tranche}`;
+
+      return {
+        nom,
+        siren,
+        secteur: nafCode2,
+        effectif,
+        ville,
+        signal
+      };
+    });
+
+    // 1. Boucle de traitement sur chaque entreprise répertoriée dans SIRENE
     for (const comp of targetCompanies) {
       // Vérification/Création du cache global public
       let cache = await prisma.entrepriseCache.findUnique({
@@ -199,16 +255,21 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
         }
       });
 
-      // 2. Cascade Waterfall décideurs
-      const targetRoles = input.besoin.rolesDecideurs.length > 0 ? input.besoin.rolesDecideurs : ['CTO', 'Gérant'];
+      // 2. Cascade Waterfall décideurs réels
+      const targetRoles = input.besoin.rolesDecideurs.length > 0 ? input.besoin.rolesDecideurs : ['Gérant', 'Directeur commercial'];
       let hasMobile = false;
+
+      const enriched = iaEnrichment[comp.siren] || {};
       
-      for (const role of targetRoles) {
-        const testName = role === 'Gérant' ? 'Marc Lemaire' : role === 'CTO' ? 'Sarah Dubreuil' : 'Jean Dupont';
+      // Si nous avons un dirigeant réel extrait, on traite son cas. Sinon on s'arrête (données factuelles uniquement)
+      if (enriched.dirigeantNom) {
+        const testName = enriched.dirigeantNom;
+        const finalRole = enriched.dirigeantRole || targetRoles[0] || 'Dirigeant';
+        const finalLinkedin = enriched.linkedinUrl || `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(finalRole + ' ' + comp.nom)}`;
         
         const enrichResult = await enrichirDecideur(
           testName,
-          role,
+          finalRole,
           comp.nom,
           'FR',
           session
@@ -223,8 +284,8 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
             organisationId: orgId,
             entrepriseTrouveeId: entTrouvee.id,
             nom: testName,
-            fonction: role,
-            linkedinUrl: `https://www.linkedin.com/in/mock-${testName.toLowerCase().replace(' ', '-')}`,
+            fonction: finalRole,
+            linkedinUrl: finalLinkedin,
             emailTrouve: enrichResult.email,
             emailStatutVerif: enrichResult.emailStatutVerif,
             emailProbabiliteBounce: enrichResult.emailProbabiliteBounce,

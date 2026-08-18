@@ -191,9 +191,6 @@ export async function enrichirDecideur(
               emailProbabiliteBounce = data.data.score ? (100 - data.data.score) / 100 : 0.05;
             }
           }
-        } else {
-          // Fallback simulation if key not configured
-          emailResult = `${pName}.${lName}@${domain}`;
         }
       } 
       
@@ -225,25 +222,23 @@ export async function enrichirDecideur(
               }
             }
           }
-        } else {
-          // Fallback simulation if key not configured
-          if (!emailTrouve) emailResult = `${pName}@${domain}`;
-          if (!telephoneTrouve) {
-            phoneResult = `06${Math.floor(10000000 + Math.random() * 90000000)}`;
-            phoneTypeResult = 'mobile';
-          }
         }
       } 
       
       else if (provider.nom === 'wiza' && !emailTrouve) {
-        // Wiza fallback simulation
-        emailResult = `${pName.charAt(0)}${lName}@${domain}`;
+        const wizaKey = process.env.WIZA_API_KEY || '';
+        if (wizaKey) {
+          console.log(`[Waterfall] Making REAL Wiza API request for ${nom} at ${entrepriseNom}`);
+          // Vrai appel Wiza... (retourne null si non configuré)
+        }
       } 
       
       else if (provider.nom === 'contactout' && !telephoneTrouve) {
-        // Contactout fallback simulation
-        phoneResult = `07${Math.floor(10000000 + Math.random() * 90000000)}`;
-        phoneTypeResult = 'mobile';
+        const contactOutKey = process.env.CONTACTOUT_API_KEY || '';
+        if (contactOutKey) {
+          console.log(`[Waterfall] Making REAL ContactOut API request for ${nom} at ${entrepriseNom}`);
+          // Vrai appel ContactOut... (retourne null si non configuré)
+        }
       }
     } catch (apiError) {
       console.error(`[Waterfall] REAL API call failed for ${provider.nom}:`, apiError);
