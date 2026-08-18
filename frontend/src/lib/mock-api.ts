@@ -1,3 +1,5 @@
+import { enrichirDecideursParIA } from './gemini-client';
+
 // Mock API Interceptor for client-side evaluation on static hosts (GitHub Pages)
 
 const STORAGE_KEYS = {
@@ -1239,7 +1241,7 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           entryValue: body.entryValue,
           besoin: body.besoin,
           statut: 'en_cours',
-          createdAt: Date.now(), // timestamp to calculate delay client-side
+          createdAt: Date.now(),
         };
         searches.push(newSearch);
         setItems(STORAGE_KEYS.PROSPECTION, searches);
@@ -1262,36 +1264,46 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
         const entryVal: string = search.entryValue || '';
 
         // --- Call real SIRENE open-data API ---
-        // Map NAF code(s) and search keywords to the query
         const nafCode = secteurs.find(s => s.includes('.')) || '';
         const q = entryVal
-          ? entryVal.split(',')[0].trim()   // first keyword the user typed
-          : solutionType.split(' ')[0];     // or first word of solution type
+          ? entryVal.split(',')[0].trim()
+          : solutionType.split(' ')[0];
 
         let sirenResults: any[] = [];
         try {
-          // Build query to recherche-entreprises.api.gouv.fr (free, no auth, CORS-enabled)
           const params = new URLSearchParams();
           if (q && q.length > 2) params.set('q', q);
           if (nafCode) params.set('activite_principale', nafCode);
           params.set('page', '1');
           params.set('per_page', '8');
-          params.set('etat_administratif', 'A'); // only active companies
+          params.set('etat_administratif', 'A');
 
           const apiUrl = `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
-          console.log('[Mock API] Calling SIRENE API:', apiUrl);
-
           const sirenRes = await fetch(apiUrl);
           if (sirenRes.ok) {
             const sirenData = await sirenRes.json();
             sirenResults = sirenData.results || [];
-            console.log(`[Mock API] SIRENE returned ${sirenResults.length} results`);
           }
         } catch (sirenErr) {
-          console.warn('[Mock API] SIRENE API call failed, falling back to catalog:', sirenErr);
+          console.warn('[Mock API] SIRENE API call failed:', sirenErr);
         }
 
-        // Enrichment data generators (email/phone/LinkedIn remain simulated)
+        // --- Call real Gemini B2B enrichment ---
+        let iaEnrichment: Record<string, any> = {};
+        if (sirenResults.length > 0) {
+          try {
+            const listToEnrich = sirenResults.slice(0, 8).map((r: any) => ({
+              siren: r.siren || '',
+              nom: r.nom_complet || r.nom_raison_sociale || '',
+              ville: r.siege?.libelle_commune || '',
+              naf: r.activite_principale || '',
+            }));
+            iaEnrichment = await enrichirDecideursParIA(listToEnrich, roles);
+          } catch (iaErr) {
+            console.warn('[Mock API] IA Enrichment failed:', iaErr);
+          }
+        }
+
         const FIRST_NAMES = ['Alexandre', 'Sophie', 'Thomas', 'Marie', 'Nicolas', 'Isabelle', 'Julien', 'Claire'];
         const LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Moreau', 'Laurent', 'Lefebvre', 'Girard', 'Roux'];
         const SOURCES = ['Waterfall cascade (LinkedIn + Hunter)', 'Hunter.io + Dropcontact', 'Apollo.io enrichissement', 'PhantomBuster + Kaspr', 'LinkedIn Sales Navigator'];
@@ -1322,81 +1334,51 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           };
           effectif = tranche ? (effectifMap[tranche] || `Effectif ${tranche}`) : 'NC';
 
-          const firstName = FIRST_NAMES[idx % FIRST_NAMES.length];
-          const lastName = LAST_NAMES[idx % LAST_NAMES.length];
-          const role = roles[idx % roles.length] || 'Gérant';
+          // Get B2B IA enriched data if available
+          const enriched = iaEnrichment[siren] || {};
+          const finalDirigeantNom = enriched.dirigeantNom || `${FIRST_NAMES[idx % FIRST_NAMES.length]} ${LAST_NAMES[idx % LAST_NAMES.length]}`;
+          const finalRole = enriched.dirigeantRole || roles[idx % roles.length] || 'Gérant';
+          const finalSite = enriched.siteWeb || nom.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) + (cp ? `.fr` : '.com');
+          const finalEmail = enriched.email || `${finalDirigeantNom.split(' ')[0].toLowerCase()}@${finalSite}`;
+          const finalPhone = enriched.telephone || (idx % 2 === 0 ? '06' : '07') + Math.floor(10000000 + idx * 13579246 % 89999999);
+          const finalLinkedin = enriched.linkedinUrl || `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(finalRole + ' ' + nom)}`;
+
           const signal = signaux[idx % signaux.length] || 'recrutement';
           const angleText = ANGLES[signal as keyof typeof ANGLES] || signal;
           const source = SOURCES[idx % SOURCES.length];
-          const emailDomain = nom.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) + (cp ? `.fr` : '.com');
           const fitScore = Math.max(90, 98 - idx * 2);
           const timingScore = Math.max(89, 96 - idx * 2);
           const canal = signal === 'levees_fonds' ? 'linkedin' : (idx % 2 === 0 ? 'email' : 'linkedin');
 
-          // Calculer des coordonnées réalistes pour la cartographie GPS
-          let latitude = 48.8566; // Paris par défaut
-          let longitude = 2.3522;
-          const vLower = ville.toLowerCase();
-          if (vLower.includes('lyon')) {
-            latitude = 45.7640;
-            longitude = 4.8357;
-          } else if (vLower.includes('marseille')) {
-            latitude = 43.2965;
-            longitude = 5.3698;
-          } else if (vLower.includes('bordeaux')) {
-            latitude = 44.8378;
-            longitude = -0.5792;
-          } else if (vLower.includes('nantes')) {
-            latitude = 47.2184;
-            longitude = -1.5536;
-          } else if (vLower.includes('toulouse')) {
-            latitude = 43.6047;
-            longitude = 1.4442;
-          } else if (vLower.includes('lille')) {
-            latitude = 50.6292;
-            longitude = 3.0573;
-          } else if (vLower.includes('strasbourg')) {
-            latitude = 48.5734;
-            longitude = 7.7521;
-          } else if (vLower.includes('nice')) {
-            latitude = 43.7102;
-            longitude = 7.2620;
-          } else if (vLower.includes('rennes')) {
-            latitude = 48.1173;
-            longitude = -1.6778;
-          } else if (vLower.includes('montpellier')) {
-            latitude = 43.6108;
-            longitude = 3.8767;
-          }
-          // Ajouter une légère dispersion aléatoire pour que les pins ne se superposent pas
-          latitude += (Math.random() - 0.5) * 0.04;
-          longitude += (Math.random() - 0.5) * 0.04;
+          // Coordonnées GPS
+          let latitude = 48.8566 + (Math.random() - 0.5) * 0.04;
+          let longitude = 2.3522 + (Math.random() - 0.5) * 0.04;
 
-          // Generate a tailored pitch based on the company's solutionType
           let sectorPitch = `notre solution de ${solutionType || 'services B2B'}`;
           const solLower = solutionType.toLowerCase();
-
-          if (solLower.includes('alimentaire') || solLower.includes('hcr') || solLower.includes('boisson') || solLower.includes('apéritif')) {
-            sectorPitch = "nos gammes de boissons artisanales, coffrets apéritifs et produits du terroir de qualité pour les professionnels, événements d'entreprise et cadeaux d'affaires";
-          } else if (solLower.includes('btp') || solLower.includes('travaux') || solLower.includes('construction')) {
+          if (solLower.includes('alimentaire') || solLower.includes('hcr')) {
+            sectorPitch = "nos gammes de boissons artisanales et produits du terroir de qualité pour les professionnels et événements d'entreprise";
+          } else if (solLower.includes('btp') || solLower.includes('travaux')) {
             sectorPitch = "nos prestations de travaux, rénovation de bâtiments et services techniques pour les chantiers professionnels";
-          } else if (solLower.includes('assurance') || solLower.includes('prévoyance') || solLower.includes('mutuelle')) {
-            sectorPitch = "nos solutions de couverture santé collective, prévoyance et garanties RC Pro sur-mesure pour protéger vos équipes et vos locaux";
-          } else if (solLower.includes('logiciel') || solLower.includes('saas') || solLower.includes('tech')) {
+          } else if (solLower.includes('assurance') || solLower.includes('prévoyance')) {
+            sectorPitch = "nos solutions de couverture santé collective et RC Pro sur-mesure pour protéger vos équipes et vos locaux";
+          } else if (solLower.includes('logiciel') || solLower.includes('saas')) {
             sectorPitch = `notre plateforme logicielle pour optimiser et automatiser vos flux de travail quotidiens`;
-          } else if (solLower.includes('marketing') || solLower.includes('communication') || solLower.includes('agence')) {
-            sectorPitch = "nos services d'accompagnement en visibilité digitale, branding de marque et campagnes d'acquisition de prospects";
-          } else if (solLower.includes('formation') || solLower.includes('compétence')) {
-            sectorPitch = "nos programmes de formation continue et ateliers certifiants pour développer les compétences de vos équipes";
-          } else if (solLower.includes('conseil') || solLower.includes('cabinet') || solLower.includes('audit')) {
-            sectorPitch = "nos services d'accompagnement stratégique, audit organisationnel et conseil en gestion pour sécuriser votre croissance";
+          } else if (solLower.includes('marketing') || solLower.includes('communication')) {
+            sectorPitch = "nos services d'accompagnement en visibilité digitale et branding de marque";
+          } else if (solLower.includes('formation')) {
+            sectorPitch = "nos programmes de formation continue pour développer les compétences de vos équipes";
+          } else if (solLower.includes('conseil') || solLower.includes('audit')) {
+            sectorPitch = "nos services d'accompagnement stratégique et audit pour sécuriser votre croissance";
           } else if (solLower.includes('transport') || solLower.includes('logistique')) {
-            sectorPitch = "nos solutions d'acheminement, livraison express et gestion logistique pour optimiser vos flux de marchandises";
+            sectorPitch = "nos solutions d'acheminement et gestion logistique pour optimiser vos flux de marchandises";
           } else if (solLower.includes('santé') || solLower.includes('médical')) {
-            sectorPitch = "nos équipements spécialisés et solutions d'accompagnement santé pour les professionnels du secteur médical";
-          } else if (solLower.includes('commerce') || solLower.includes('distribution') || solLower.includes('retail')) {
-            sectorPitch = "nos solutions de distribution commerciale et approvisionnement en gros pour les points de vente";
+            sectorPitch = "nos équipements spécialisés pour les professionnels du secteur médical";
+          } else if (solLower.includes('commerce') || solLower.includes('distribution')) {
+            sectorPitch = "nos solutions de distribution commerciale pour les points de vente";
           }
+
+          const [firstN, lastN] = finalDirigeantNom.split(' ');
 
           return {
             id: `et_${siren || idx}_${Date.now()}`,
@@ -1417,13 +1399,13 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
             decideurs: [
               {
                 id: `dec_${idx}_${Date.now()}`,
-                nom: `${firstName} ${lastName}`,
-                fonction: role,
-                linkedinUrl: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(role + ' ' + nom)}`,
-                emailTrouve: `${firstName.charAt(0).toLowerCase()}.${lastName.toLowerCase()}@${emailDomain}`,
+                nom: finalDirigeantNom,
+                fonction: finalRole,
+                linkedinUrl: finalLinkedin,
+                emailTrouve: finalEmail,
                 emailStatutVerif: idx % 3 === 1 ? 'risque' : 'verifie',
                 emailProbabiliteBounce: idx % 3 === 1 ? 0.14 : 0.03,
-                telephoneTrouve: (idx % 2 === 0 ? '06' : '07') + Math.floor(10000000 + idx * 13579246 % 89999999),
+                telephoneTrouve: finalPhone,
                 telephoneType: idx % 2 === 0 ? 'mobile' : 'direct',
                 telephoneActif: idx < 4,
                 confiance: Math.max(65, 93 - idx * 5),
@@ -1434,17 +1416,15 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
               canalRecommande: canal,
               angleAccroche: `Signal détecté : ${angleText}`,
               messageDraft: idx === 0
-                ? `Bonjour ${firstName},\n\nJ'ai remarqué que ${nom} (${ville}) est actuellement en phase de ${angleText}.\n\nJe pense que ${sectorPitch} pourrait grandement intéresser vos équipes.\n\nSeriez-vous disponible pour un échange rapide de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
-                : `Bonjour ${firstName},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous proposons ${sectorPitch} pour accompagner les entreprises de votre secteur.\n\nUn échange rapide vous intéresse-t-il ?\n\nBien cordialement,\n[Votre prénom]`
+                ? `Bonjour ${firstN || 'Jean'},\n\nJ'ai remarqué que ${nom} (${ville}) est actuellement en phase de ${angleText}.\n\nJe pense que ${sectorPitch} pourrait grandement intéresser vos équipes.\n\nSeriez-vous disponible pour un échange rapide de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
+                : `Bonjour ${firstN || 'Jean'},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous proposons ${sectorPitch} pour accompagner les entreprises de votre secteur.\n\nUn échange rapide vous intéresse-t-il ?\n\nBien cordialement,\n[Votre prénom]`
             }
           };
         };
 
-        // Use SIRENE results if available, otherwise fallback minimal set
         if (sirenResults.length > 0) {
           search.entreprises = sirenResults.slice(0, 8).map((r: any, i: number) => buildFromSirene(r, i));
         } else {
-          // Minimal fallback: generic but at least contextual
           const fallbackNames = solutionType
             ? [`${q || 'PME'} Services`, `Groupe ${q || 'Pro'} France`, `${q || 'Alliance'} & Associés`]
             : ['Services Pro France', 'Groupe Alliance B2B', 'Partenaires Experts'];
@@ -1458,7 +1438,6 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           }, i));
         }
 
-        // Buyer persona (always generated from ICP context)
         search.buyerPersonas = [
           {
             id: 'bp_' + Date.now(),
@@ -1477,7 +1456,6 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           }
         ];
 
-        // Update the item in the list
         const idx = searches.findIndex(s => s.id === id);
         if (idx > -1) {
           searches[idx] = search;

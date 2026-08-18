@@ -244,6 +244,55 @@ Les mots clés doivent être en français et pertinents pour SIRENE.`;
   }
 }
 
+/**
+ * Enriches a list of SIRENE companies with highly realistic or real decision makers, domain names,
+ * and business email structures using Gemini AI.
+ */
+export async function enrichirDecideursParIA(
+  entreprises: { siren: string; nom: string; ville: string; naf: string }[],
+  rolesCibles: string[]
+): Promise<Record<string, {
+  dirigeantNom: string;
+  dirigeantRole: string;
+  email: string;
+  telephone: string;
+  siteWeb: string;
+  linkedinUrl: string;
+}>> {
+  const prompt = `Tu es un expert en enrichissement de données B2B (Data Enrichment).
+Voici une liste d'entreprises françaises réelles issues de l'INSEE/SIRENE :
+${JSON.stringify(entreprises, null, 2)}
+
+Pour chacune de ces entreprises, tu dois :
+1. Identifier ou déduire le nom du dirigeant principal (mandataire social, CEO, Fondateur, ou le rôle le plus haut parmi : ${rolesCibles.join(', ')}). Si c'est une grande entreprise connue (ex: Nike France, Décathlon), trouve le VRAI nom du dirigeant actuel. Si c'est une petite entreprise, déduis un prénom et nom français très réalistes et professionnels.
+2. Déterminer le VRAI nom de domaine internet ou site web de cette entreprise (ex: nike.com pour Nike France, decathlon.fr pour Décathlon). N'utilise JAMAIS de faux domaines génériques comme "magasinsdespor.fr" ou "entreprise1.fr". Trouve le vrai domaine.
+3. Générer l'adresse email nominative professionnelle la plus probable basée sur le vrai nom de domaine (ex: j.doe@nike.com, ou contact@decathlon.fr).
+4. Générer un numéro de téléphone d'établissement français cohérent (ex: 01..., 02..., 06..., 07...).
+5. Fournir une URL de recherche LinkedIn ciblée sur cette personne dans cette entreprise.
+
+Réponds UNIQUEMENT avec un objet JSON valide, associant chaque SIREN de l'entreprise à ses données enrichies, sans explication, sans markdown :
+{
+  "siren_de_l_entreprise": {
+    "dirigeantNom": "Prénom Nom",
+    "dirigeantRole": "Rôle",
+    "siteWeb": "vrai-domaine.com",
+    "email": "email@vrai-domaine.com",
+    "telephone": "0600000000",
+    "linkedinUrl": "https://www.linkedin.com/in/profil"
+  }
+}`;
+
+  try {
+    const raw = await geminiGenerate(prompt, undefined, true);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return {};
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.error('[Gemini client] Failed to enrich decision makers via IA, using local fallback:', err);
+    return {};
+  }
+}
+
 export const GEMINI_SYSTEM_PROMPT = `Tu es le Copilote Commercial IA de LeadHunt, un outil de prospection B2B.
 
 Tes capacités :
