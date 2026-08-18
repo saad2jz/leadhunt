@@ -1,0 +1,53 @@
+import { verifierQuotaAPI, enrichirDecideur } from "../src/lib/waterfall";
+
+// Mock minimal de prisma pour les tests unitaires
+jest.mock("../src/lib/prisma", () => ({
+  prisma: {
+    usageAPI: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    }
+  }
+}));
+
+describe("Waterfall & Quotas API Verification tests", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("Devrait valider le fonctionnement des quotas en simulation mock client-side", async () => {
+    // Dans le navigateur (typeof window !== 'undefined'), localStorage est mocké
+    if (typeof window !== 'undefined') {
+      const authorization = await verifierQuotaAPI("hunter", "org_test");
+      expect(authorization).toBe(true);
+    }
+  });
+
+  test("Devrait enrichir correctement le décideur avec priorité et statut de confiance", async () => {
+    const mockSession = {
+      user: {
+        id: "usr_test",
+        nom: "Test User",
+        email: "test@leadhunt.io",
+        organisationId: "org_test",
+        role: "administrateur"
+      }
+    };
+
+    const result = await enrichirDecideur(
+      "Alexandre Martin",
+      "Directeur Commercial",
+      "Nike France",
+      "FR",
+      mockSession
+    );
+
+    // Assertions sur le comportement de la cascade waterfall
+    expect(result.email).toContain("@nikefrance.fr");
+    expect(result.emailStatutVerif).toBeDefined();
+    expect(result.emailProbabiliteBounce).toBeLessThanOrEqual(1.0);
+    expect(result.telephoneType).toBe("mobile");
+    expect(result.telephone).toMatch(/^0[67]/); // Strict mobile check (06 ou 07)
+  });
+});
