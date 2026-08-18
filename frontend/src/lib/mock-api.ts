@@ -1247,29 +1247,11 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           else if (/saas|logiciel|tech|digital/i.test(ev)) catalog = sectorCatalog.logiciel;
         }
 
-        const zone1 = zones[0] || catalog.villes[0];
-        const zone2 = zones[1] || catalog.villes[1] || catalog.villes[0];
-        const role1 = roles[0] || 'Gérant';
-        const role2 = roles[1] || 'Directeur commercial';
-        const signal1 = signaux[0] || 'recrutement';
-        const signal2 = signaux[1] || 'levees_fonds';
-        const c1 = catalog.companies[0];
-        const c2 = catalog.companies[1];
-        const p1 = catalog.prenoms[0];
-        const p2 = catalog.prenoms[1];
-        const a1 = catalog.angles[0];
-        const a2 = catalog.angles[1];
-        const emailDomain1 = c1[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) + '.fr';
-        const emailDomain2 = c2[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) + '.com';
-        const firstName1 = p1.split(' ')[0];
-        const firstName2 = p2.split(' ')[0];
-        const lastName1 = p1.split(' ')[1] || '';
-        const lastName2 = p2.split(' ')[1] || '';
 
         search.buyerPersonas = [
           {
             id: 'bp_' + Date.now(),
-            roleTarget: role1,
+            roleTarget: roles[0] || 'Gérant',
             motivations: JSON.stringify([
               `Développer rapidement un portefeuille de ${catalog.mots[0]} qualifiés.`,
               `Réduire le temps de prospection manuelle et automatiser les relances.`,
@@ -1279,79 +1261,70 @@ function handleMockRoute(url: string, init?: RequestInit): any {
               `Doute sur la qualité des données pour le secteur ${catalog.mots[0]}.`,
               `Préférence pour les recommandations réseau plutôt que la prospection froide.`
             ]),
-            vocabulaire: JSON.stringify(['Pipeline', catalog.mots[0], 'Relance', 'Ciblage', signal1 === 'recrutement' ? 'Signal recrutement' : 'Levée de fonds']),
+            vocabulaire: JSON.stringify(['Pipeline', catalog.mots[0], 'Relance', 'Ciblage', (signaux[0] || 'recrutement') === 'recrutement' ? 'Signal recrutement' : 'Levée de fonds']),
             kpis: JSON.stringify(['Taux de réponse', 'RDV qualifiés', 'Cycle de vente', 'Taux de transformation'])
           }
         ];
 
-        search.entreprises = [
-          {
-            id: 'et1',
-            nom: c1[0],
-            secteur: c1[1],
-            effectif: c1[2],
-            ville: zone1,
-            fitScore: 91 + Math.floor(Math.random() * 5),
-            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: true }),
-            timingScore: 83 + Math.floor(Math.random() * 8),
-            timingDetail: JSON.stringify({ signalDetecte: signal1 }),
+        // Helper to build one company entry from catalog index
+        const buildCompany = (idx: number) => {
+          const c = catalog.companies[idx % catalog.companies.length];
+          const p = catalog.prenoms[idx % catalog.prenoms.length];
+          const angle = catalog.angles[idx % catalog.angles.length];
+          const vil = zones[idx % zones.length] || catalog.villes[idx % catalog.villes.length];
+          const sig = signaux[idx % signaux.length] || 'recrutement';
+          const role = roles[idx % roles.length] || 'Gérant';
+          const firstName = p.split(' ')[0];
+          const lastName = p.split(' ').slice(1).join(' ') || '';
+          const emailDom = c[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) + (idx % 2 === 0 ? '.fr' : '.com');
+          const emailVerif = idx % 3 === 1 ? 'risque' : 'verifie';
+          const bounce = idx % 3 === 1 ? 0.12 : 0.03;
+          const confiance = 95 - idx * 4;
+          const fitScore = 95 - idx * 2 + (idx % 2);
+          const timingScore = 92 - idx * 3 + (idx % 2);
+          const telPrefix = idx % 2 === 0 ? '06' : '07';
+          const telSuffix = Math.floor(10000000 + (idx * 12345678) % 89999999);
+          const canal = sig === 'levees_fonds' ? 'linkedin' : (idx % 2 === 0 ? 'email' : 'linkedin');
+          const source = ['Waterfall cascade (LinkedIn + Hunter)', 'Hunter.io + Cascade Kaspr', 'Dropcontact + LinkedIn Sales Nav', 'PhantomBuster + Enrich', 'Apollo.io enrichissement'][idx % 5];
+
+          return {
+            id: `et${idx + 1}`,
+            nom: c[0],
+            secteur: c[1],
+            effectif: c[2],
+            ville: vil,
+            fitScore,
+            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: idx < 2 }),
+            timingScore,
+            timingDetail: JSON.stringify({ signalDetecte: sig }),
             statutCRM: 'nouveau',
             decideurs: [
               {
-                id: 'dec1',
-                nom: p1,
-                fonction: role1,
-                linkedinUrl: `https://www.linkedin.com/in/${firstName1.toLowerCase()}-${lastName1.toLowerCase()}-leadhunt`,
-                emailTrouve: `${firstName1.charAt(0).toLowerCase()}.${lastName1.toLowerCase()}@${emailDomain1}`,
-                emailStatutVerif: 'verifie',
-                emailProbabiliteBounce: 0.02,
-                telephoneTrouve: '06' + Math.floor(10000000 + Math.random() * 89999999),
-                telephoneType: 'mobile',
-                telephoneActif: true,
-                confiance: 93,
-                source: 'Waterfall cascade (LinkedIn + Hunter)'
+                id: `dec${idx + 1}`,
+                nom: p,
+                fonction: role,
+                linkedinUrl: `https://www.linkedin.com/in/${firstName.toLowerCase()}-${lastName.toLowerCase().replace(/\s/g, '-')}-lh`,
+                emailTrouve: `${firstName.charAt(0).toLowerCase()}.${lastName.toLowerCase().replace(/\s/g, '')}@${emailDom}`,
+                emailStatutVerif: emailVerif,
+                emailProbabiliteBounce: bounce,
+                telephoneTrouve: telPrefix + telSuffix,
+                telephoneType: idx % 2 === 0 ? 'mobile' : 'direct',
+                telephoneActif: idx !== 4,
+                confiance,
+                source
               }
             ],
             planApproche: {
-              canalRecommande: signal1 === 'recrutement' ? 'email' : 'linkedin',
-              angleAccroche: `Signal détecté : ${a1}`,
-              messageDraft: `Bonjour ${firstName1},\n\nJ'ai remarqué que ${c1[0]} est actuellement en phase de ${a1}.\n\nNous accompagnons des ${catalog.mots[0]} comme vous à accélérer leur développement commercial B2B — sans effort manuel.\n\nSeriez-vous disponible pour un échange de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
+              canalRecommande: canal,
+              angleAccroche: `Signal détecté : ${angle}`,
+              messageDraft: idx === 0
+                ? `Bonjour ${firstName},\n\nJ'ai remarqué que ${c[0]} est actuellement en phase de ${angle}.\n\nNous accompagnons des ${catalog.mots[0]} comme vous à accélérer leur développement commercial B2B — sans effort manuel.\n\nSeriez-vous disponible pour un échange de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
+                : `Bonjour ${firstName},\n\nSuite à votre récent ${angle} chez ${c[0]}, je souhaitais vous contacter directement.\n\nNous aidons les ${catalog.mots[idx % catalog.mots.length] || catalog.mots[0]} à cibler et convertir leurs prospects B2B avec un minimum d'effort.\n\nUn échange rapide vous intéresse ?\n\nBien cordialement,\n[Votre prénom]`
             }
-          },
-          {
-            id: 'et2',
-            nom: c2[0],
-            secteur: c2[1],
-            effectif: c2[2],
-            ville: zone2,
-            fitScore: 85 + Math.floor(Math.random() * 5),
-            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: zone2 !== zone1 }),
-            timingScore: 87 + Math.floor(Math.random() * 8),
-            timingDetail: JSON.stringify({ signalDetecte: signal2 }),
-            statutCRM: 'nouveau',
-            decideurs: [
-              {
-                id: 'dec2',
-                nom: p2,
-                fonction: role2,
-                linkedinUrl: `https://www.linkedin.com/in/${firstName2.toLowerCase()}-${lastName2.toLowerCase()}-leadhunt`,
-                emailTrouve: `${firstName2.toLowerCase()}.${lastName2.charAt(0).toLowerCase()}@${emailDomain2}`,
-                emailStatutVerif: 'risque',
-                emailProbabiliteBounce: 0.12,
-                telephoneTrouve: '04' + Math.floor(10000000 + Math.random() * 89999999),
-                telephoneType: 'direct',
-                telephoneActif: true,
-                confiance: 80,
-                source: 'Hunter.io + Cascade Kaspr'
-              }
-            ],
-            planApproche: {
-              canalRecommande: signal2 === 'levees_fonds' ? 'linkedin' : 'email',
-              angleAccroche: `Signal détecté : ${a2}`,
-              messageDraft: `Bonjour ${firstName2},\n\nSuite à votre récent ${a2}, je souhaitais vous contacter directement.\n\nNous aidons les ${catalog.mots[1] || catalog.mots[0]} à cibler et convertir leurs prospects B2B avec un minimum d'effort.\n\nUn échange rapide vous intéresse ?\n\nBien cordialement,\n[Votre prénom]`
-            }
-          }
-        ];
+          };
+        };
+
+        search.entreprises = Array.from({ length: catalog.companies.length }, (_, i) => buildCompany(i));
 
         // Update the item in the list
         const idx = searches.findIndex(s => s.id === id);
