@@ -550,6 +550,29 @@ function handleMockRoute(url: string, init?: RequestInit): any {
       return { success: true };
     }
 
+    case 'contacts': {
+      const prospects = getItems(STORAGE_KEYS.PROSPECTS);
+      const index = prospects.findIndex(p => p.id === body.prospectId);
+      if (index > -1) {
+        if (!prospects[index].contacts) {
+          prospects[index].contacts = [];
+        }
+        const newContact = {
+          id: 'c_' + Date.now(),
+          nom: body.nom,
+          email: body.email,
+          telephone: body.telephone,
+          fonction: body.role || body.fonction || 'Décideur',
+        };
+        prospects[index].contacts.push(newContact);
+        // Recalculate/increment score slightly on adding contacts
+        prospects[index].score = Math.min(100, (prospects[index].score || 50) + 10);
+        setItems(STORAGE_KEYS.PROSPECTS, prospects);
+        return { success: true, contact: newContact };
+      }
+      return { error: 'Prospect introuvable' };
+    }
+
     case 'prospects': {
       const prospects = getItems(STORAGE_KEYS.PROSPECTS);
       if (method === 'POST') {

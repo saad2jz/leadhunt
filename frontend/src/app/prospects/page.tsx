@@ -20,7 +20,7 @@ export default function ProspectsPage() {
   const [contactNom, setContactNom] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [contactRole, setContactRole] = useState('Décideur');
+  const [contactRole, setContactRole] = useState('Directeur');
   const [addingContact, setAddingContact] = useState(false);
 
   // Modale pour ajouter un prospect manuel
@@ -576,14 +576,23 @@ export default function ProspectsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Rôle / Poste</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={contactRole}
                   onChange={(e) => setContactRole(e.target.value)}
                   className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
-                  placeholder="Directeur Général, CEO, CTO..."
-                />
+                >
+                  <option value="Directeur">Directeur</option>
+                  <option value="Responsable Achat">Responsable Achat</option>
+                  <option value="Vice Président">Vice Président</option>
+                  <option value="Directeur Général / CEO">Directeur Général / CEO</option>
+                  <option value="Directeur Commercial / VP Sales">Directeur Commercial / VP Sales</option>
+                  <option value="Directeur Technique / CTO">Directeur Technique / CTO</option>
+                  <option value="Responsable Commercial">Responsable Commercial</option>
+                  <option value="Directeur Marketing / CMO">Directeur Marketing / CMO</option>
+                  <option value="Directeur Financier / CFO">Directeur Financier / CFO</option>
+                  <option value="Autre Décideur">Autre Décideur</option>
+                </select>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
