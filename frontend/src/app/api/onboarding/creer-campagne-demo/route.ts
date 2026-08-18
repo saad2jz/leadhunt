@@ -28,14 +28,12 @@ export async function POST() {
             {
               organisationId: session.user.organisationId,
               nom: 'Premier contact - Présentation',
-              type: 'email',
-              delaiJours: 0,
+              ordre: 0,
             },
             {
               organisationId: session.user.organisationId,
               nom: 'Relance 1 - Proposition de valeur',
-              type: 'email',
-              delaiJours: 3,
+              ordre: 1,
             },
           ],
         },

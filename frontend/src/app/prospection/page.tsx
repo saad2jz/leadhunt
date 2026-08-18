@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
+import { analyzeWebsiteICP } from '@/lib/gemini-client';
 import { 
   Building, Sparkles, BarChart2, Users, FileText, Check, 
   ThumbsUp, ThumbsDown, ArrowRight, Loader2, Play, Sliders, Globe, Download
@@ -91,33 +92,25 @@ export default function ProspectionSearchPage() {
 
     setLoadingIcp(true);
     try {
-      const res = await fetch('/api/icp/decouvrir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteUrl }),
-      });
+      // Use real Gemini AI to analyze the website ICP
+      const icp = await analyzeWebsiteICP(siteUrl);
 
-      if (res.ok) {
-        const data = await res.json();
-        const icp = data.icp;
-        setSolutionType(icp.besoinGenere.solutionType || '');
-        setTailleMin(icp.besoinGenere.tailleMin || 1);
-        setTailleMax(icp.besoinGenere.tailleMax || 100);
-        setZonesGeo(icp.besoinGenere.zonesGeo || []);
-        setSecteurs(icp.besoinGenere.secteurs || []);
-        setBudgetType(icp.besoinGenere.budgetType || 'Moyen');
-        setSignauxAchat(icp.besoinGenere.signauxAchat || []);
-        setRolesDecideurs(icp.besoinGenere.rolesDecideurs || []);
-        // Pré-remplir aussi le point d'entrée avec les mots-clés suggérés
-        if (icp.besoinGenere.motsClesSuggeres) {
-          setEntryType('motscles');
-          setEntryValue(icp.besoinGenere.motsClesSuggeres);
-        }
-      } else {
-        alert("Impossible d'analyser l'ICP de ce domaine.");
+      setSolutionType(icp.solutionType || '');
+      setTailleMin(icp.tailleMin || 1);
+      setTailleMax(icp.tailleMax || 100);
+      setZonesGeo(icp.zonesGeo || []);
+      setSecteurs(icp.secteurs || []);
+      setBudgetType(icp.budgetType || 'Moyen');
+      setSignauxAchat(icp.signauxAchat || []);
+      setRolesDecideurs(icp.rolesDecideurs || []);
+      // Pre-fill entry with Gemini-suggested keywords
+      if (icp.motsClesSuggeres) {
+        setEntryType('motscles');
+        setEntryValue(icp.motsClesSuggeres);
       }
-    } catch (err) {
-      alert("Erreur réseau lors de la découverte de l'ICP.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      alert(`Erreur lors de l'analyse IA du site : ${msg}`);
     } finally {
       setLoadingIcp(false);
     }

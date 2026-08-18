@@ -35,9 +35,9 @@ export async function POST(req: Request) {
 
         if (!prospect) {
           // Cherche directement sur le prospect
-          prospect = await prisma.prospect.findFirst({
+          prospect = (await prisma.prospect.findFirst({
             where: { email },
-          });
+          })) ?? undefined;
         }
 
         if (prospect) {

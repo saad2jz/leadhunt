@@ -19,10 +19,10 @@ L.Marker.prototype.options.icon = DefaultIcon;
 interface Prospect {
   id: string;
   nom: string;
-  adresse: string;
-  ville: string;
+  adresse: string | null;
+  ville: string | null;
   statut: string;
-  score: number;
+  score: number | null;
   latitude: number | null;
   longitude: number | null;
 }

@@ -1,20 +1,105 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, X, Send, Bot, User, Check, AlertCircle } from 'lucide-react';
+import { Sparkles, X, Send, Bot, User, Check, AlertCircle, Loader2, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { geminiChat, GEMINI_SYSTEM_PROMPT } from '@/lib/gemini-client';
+
+// ---- Types ----
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'action_proposal';
+  content?: string;
+  actionId?: string;
+  typeAction?: string;
+  parametres?: Record<string, unknown>;
+}
+
+interface ProposedAction {
+  typeAction: string;
+  parametres: Record<string, unknown>;
+}
+
+// ---- Helpers ----
+function getStoredProspects() {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem('leadhunt_mock_prospects') || '[]');
+  } catch { return []; }
+}
+
+function getStoredCampagnes() {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem('leadhunt_mock_campagnes') || '[]');
+  } catch { return []; }
+}
+
+// ---- Context injected into Gemini ----
+function buildContextualSystemPrompt(): string {
+  const prospects = getStoredProspects();
+  const campagnes = getStoredCampagnes();
+
+  const prospectSummary = prospects.length > 0
+    ? `Tu gères actuellement ${prospects.length} prospect(s) dont: ${prospects.slice(0, 3).map((p: any) => p.nom).join(', ')}${prospects.length > 3 ? ', ...' : ''}.`
+    : 'Le CRM ne contient pas encore de prospects.';
+
+  const campagneSummary = campagnes.length > 0
+    ? `Il y a ${campagnes.length} campagne(s) active(s): ${campagnes.slice(0, 2).map((c: any) => c.nom).join(', ')}${campagnes.length > 2 ? ', ...' : ''}.`
+    : 'Aucune campagne créée pour le moment.';
+
+  return `${GEMINI_SYSTEM_PROMPT}
+
+## Contexte actuel du CRM de l'utilisateur
+${prospectSummary}
+${campagneSummary}
+
+## Actions disponibles
+- recherche_entreprise : lancer une recherche SIRENE (vrai données entreprises françaises)
+- inscrire_sequence : inscrire des prospects à une séquence d'emails
+- envoyer_email : envoyer un email à un prospect
+- navigation : naviguer vers une page de l'application
+- ajouter_prospect : ajouter un prospect manuellement
+
+## Pages de l'application
+- /dashboard : tableau de bord statistiques
+- /prospects : liste et gestion des prospects (CRM)
+- /prospection : outil de recherche et génération de prospects (SIRENE)
+- /campagnes : campagnes et séquences d'emails
+- /carte : carte géographique des prospects
+- /settings : paramètres et intégrations
+
+## Instructions de format
+Si tu proposes une action concrète, structure ta réponse EXACTEMENT ainsi (JSON valide) :
+{"response": "Ton texte de réponse", "proposedAction": {"typeAction": "nom_action", "parametres": {}}}
+
+Si tu réponds seulement (sans action), utilise :
+{"response": "Ton texte de réponse"}
+
+IMPORTANT: Ne dépasse JAMAIS les 3 lignes dans ta réponse. Sois concis et actionable.`;
+}
+
+// ---- Suggestion bubbles ----
+const SUGGESTIONS = [
+  { label: 'Recherche SIRENE', icon: '🔍', text: 'Lance une recherche SIRENE pour trouver des prospects' },
+  { label: 'Prospects CRM', icon: '👥', text: 'Combien de prospects ai-je dans mon CRM ?' },
+  { label: 'Carte des prospects', icon: '🗺️', text: 'Navigue vers la carte des prospects' },
+  { label: 'Créer une campagne', icon: '📧', text: 'Comment créer une campagne email ?' },
+  { label: 'Statistiques', icon: '📊', text: 'Montre-moi le tableau de bord' },
+];
 
 export default function CopiloteWidget() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<any[]>([
-    { role: 'assistant', content: "Bonjour ! Je suis votre copilote commercial IA. Je peux lancer des recherches SIRENE, inscrire des prospects à des campagnes, ou vérifier vos statistiques. Que puis-je faire pour vous ?" }
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'assistant', content: "Bonjour 👋 Je suis votre **Copilote Commercial IA** (propulsé par Gemini). Je peux lancer des recherches SIRENE, analyser des sites web, gérer vos prospects et naviguer dans l'application. Que souhaitez-vous faire ?" }
   ]);
   const [input, setInput] = useState('');
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
-  const [executingActionId, setExecutingActionId] = useState<string | null>(null);
+  const [geminiError, setGeminiError] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
+
+  // Conversation history for multi-turn context (Gemini format)
+  const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -24,147 +109,149 @@ export default function CopiloteWidget() {
     }
   }, [messages, loading]);
 
-  const SUGGESTIONS = [
-    { label: 'Recherche SIRENE', icon: '🔍', text: 'Lancer une recherche SIRENE' },
-    { label: 'Remplir prospection ffaperitif.com', icon: '⚡', text: 'Remplis le formulaire de prospection pour ffaperitif.com' },
-    { label: 'Ajouter prospect Nestlé', icon: '📝', text: 'Remplis le formulaire de prospect pour Nestlé' },
-    { label: 'Voir la Carte GPS', icon: '🗺️', text: 'Navigue vers la carte des prospects' },
-    { label: 'Voir les statistiques', icon: '📊', text: 'Voir mes statistiques CRM' },
-  ];
-
+  // ---- Local navigation/form-fill shortcuts ----
   const handleNavigationOrFormCompletion = (text: string): boolean => {
-    const lowerText = text.toLowerCase();
-    
-    // 1. FORM COMPLETION
-    if (lowerText.includes('remplis') || lowerText.includes('remplir') || lowerText.includes('complète') || lowerText.includes('complete') || lowerText.includes('saisis')) {
-      if (lowerText.includes('prospection') || lowerText.includes('recherche')) {
-        const match = text.match(/(?:pour|le site|de|du site|saisir|saisis)\s+([a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}|[a-zA-Z0-9.-]+)/i);
-        const domain = match ? match[1] : 'ffaperitif.com';
-        
-        setMessages(prev => [...prev, { role: 'assistant', content: `Remplissage automatique du formulaire de prospection pour **${domain}**...` }]);
-        router.push('/prospection');
-        
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('copilote-fill-form', {
-            detail: {
-              page: '/prospection',
-              data: { siteUrl: domain, entryValue: domain }
-            }
-          }));
-        }, 800);
-        return true;
-      }
+    const lower = text.toLowerCase();
 
-      if (lowerText.includes('prospect') || lowerText.includes('crm') || lowerText.includes('manuel')) {
-        const match = text.match(/(?:prospect|nommé|nom|l'entreprise|l’entreprise)\s+([a-zA-Z0-9À-ÿ\s'-]+)/i);
-        const name = match ? match[1].trim() : 'Nestlé';
-        
-        setMessages(prev => [...prev, { role: 'assistant', content: `Remplissage automatique du formulaire pour ajouter le prospect **${name}**...` }]);
-        router.push('/prospects');
-        
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('copilote-fill-form', {
-            detail: {
-              page: '/prospects',
-              data: {
-                nom: name,
-                secteur: 'Restauration / Agroalimentaire',
-                ville: 'Paris',
-                adresse: '7 Rue de la Paix',
-                siteWeb: `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}.fr`,
-                email: `contact@${name.toLowerCase().replace(/[^a-z0-9]/g, '')}.fr`,
-                telephone: '0140203040',
-                score: 90
-              }
-            }
-          }));
-        }, 800);
-        return true;
-      }
+    if (lower.includes('carte') || lower.includes('map gps')) {
+      addAssistantMessage('Navigation vers la 🗺️ **Carte des prospects**...');
+      router.push('/carte');
+      return true;
     }
-
-    // 2. PAGE NAVIGATION
-    if (lowerText.includes('va sur') || lowerText.includes('aller') || lowerText.includes('redirige') || lowerText.includes('affiche la page') || lowerText.includes('navigue vers') || lowerText.includes('montre')) {
-      let targetPath = '';
-      let pageName = '';
-      if (lowerText.includes('carte') || lowerText.includes('map') || lowerText.includes('gps')) {
-        targetPath = '/carte';
-        pageName = 'la Carte des prospects';
-      } else if (lowerText.includes('prospection') || lowerText.includes('recherche')) {
-        targetPath = '/prospection';
-        pageName = 'la Recherche de prospection';
-      } else if (lowerText.includes('prospect') || lowerText.includes('crm')) {
-        targetPath = '/prospects';
-        pageName = 'la Gestion des prospects';
-      } else if (lowerText.includes('campagne')) {
-        targetPath = '/campagnes';
-        pageName = 'les Campagnes';
-      } else if (lowerText.includes('stat') || lowerText.includes('tableau de bord') || lowerText.includes('dashboard')) {
-        targetPath = '/dashboard';
-        pageName = 'le Tableau de bord';
-      } else if (lowerText.includes('paramètre') || lowerText.includes('settings') || lowerText.includes('intégration')) {
-        targetPath = '/settings';
-        pageName = 'les Paramètres';
-      }
-
-      if (targetPath) {
-        setMessages(prev => [...prev, { role: 'assistant', content: `Naviguons vers **${pageName}**...` }]);
-        router.push(targetPath);
-        return true;
-      }
+    if ((lower.includes('tableau') && lower.includes('bord')) || lower.includes('dashboard')) {
+      addAssistantMessage('Navigation vers le 📊 **Tableau de bord**...');
+      router.push('/dashboard');
+      return true;
+    }
+    if (lower.includes('campagne')) {
+      addAssistantMessage('Navigation vers les 📧 **Campagnes**...');
+      router.push('/campagnes');
+      return true;
+    }
+    if (lower.includes('prospection') && (lower.includes('va') || lower.includes('navigue') || lower.includes('aller') || lower.includes('ouvrir'))) {
+      addAssistantMessage('Navigation vers la 🔍 **Recherche de prospection**...');
+      router.push('/prospection');
+      return true;
+    }
+    if (lower.includes('paramètre') || lower.includes('settings') || lower.includes('intégration')) {
+      addAssistantMessage('Navigation vers les ⚙️ **Paramètres**...');
+      router.push('/settings');
+      return true;
     }
 
     return false;
   };
 
-  const handleSelectSuggestion = async (text: string) => {
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
-    
-    // Try local action first (navigation / form filling)
-    if (handleNavigationOrFormCompletion(text)) {
+  const addAssistantMessage = (content: string) => {
+    setMessages(prev => [...prev, { role: 'assistant', content }]);
+  };
+
+  // ---- Execute a proposed action ----
+  const executeProposedAction = async (action: ProposedAction) => {
+    const { typeAction, parametres } = action;
+
+    if (typeAction === 'navigation') {
+      const page = (parametres.page as string) || '/dashboard';
+      addAssistantMessage(`Navigation vers **${page}**...`);
+      router.push(page);
       return;
     }
 
+    if (typeAction === 'recherche_entreprise') {
+      addAssistantMessage('🔍 Redirection vers la page de prospection SIRENE...');
+      router.push('/prospection');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('copilote-fill-form', {
+          detail: {
+            page: '/prospection',
+            data: {
+              siteUrl: (parametres.siteUrl as string) || '',
+              entryValue: (parametres.entryValue as string) || (parametres.secteur as string) || '',
+            }
+          }
+        }));
+      }, 900);
+      return;
+    }
+
+    if (typeAction === 'ajouter_prospect') {
+      addAssistantMessage(`📝 Ouverture du formulaire de prospect...`);
+      router.push('/prospects');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('copilote-fill-form', {
+          detail: {
+            page: '/prospects',
+            data: parametres,
+          }
+        }));
+      }, 900);
+      return;
+    }
+
+    addAssistantMessage(`✅ Action **${typeAction}** prise en compte.`);
+  };
+
+  // ---- Send a message to Gemini ----
+  const sendToGemini = async (userMsg: string) => {
     setLoading(true);
-    if (text === 'Lancer une recherche SIRENE') {
-      setShowSuggestions(false);
+    setGeminiError(null);
+    setShowSuggestions(false);
+
+    // Add to history
+    historyRef.current.push({ role: 'user', content: userMsg });
+
+    // Keep last 10 messages to avoid token overflow
+    if (historyRef.current.length > 10) {
+      historyRef.current = historyRef.current.slice(-10);
     }
 
     try {
-      const res = await fetch('/api/ia/copilote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversationId }),
-      });
+      const systemPrompt = buildContextualSystemPrompt();
+      const rawResponse = await geminiChat(historyRef.current, systemPrompt);
 
-      if (res.ok) {
-        const data = await res.json();
-        setConversationId(data.conversationId);
-        if (data.messages) {
-          setMessages(data.messages);
-          const lastMsg = data.messages[data.messages.length - 1];
-          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.includes('Quel secteur')) {
-            setShowSuggestions(false);
-          } else {
-            setShowSuggestions(true);
+      // Try to parse as JSON (structured response)
+      let assistantText = rawResponse;
+      let proposedAction: ProposedAction | null = null;
+
+      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.response) {
+            assistantText = parsed.response;
           }
+          if (parsed.proposedAction) {
+            proposedAction = parsed.proposedAction;
+          }
+        } catch {
+          // Not valid JSON, use raw text
+          assistantText = rawResponse;
         }
-        if (data.proposedAction) {
-          setMessages(prev => [
-            ...prev,
-            {
-              role: 'action_proposal',
-              actionId: data.proposedAction.id,
-              typeAction: data.proposedAction.typeAction,
-              parametres: JSON.parse(data.proposedAction.parametres || '{}'),
-            }
-          ]);
-        }
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: "Désolé, je rencontre des difficultés." }]);
       }
-    } catch (e) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Erreur de connexion." }]);
+
+      // Add to history
+      historyRef.current.push({ role: 'assistant', content: assistantText });
+
+      setMessages(prev => [...prev, { role: 'assistant', content: assistantText }]);
+
+      if (proposedAction) {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'action_proposal',
+            actionId: `action_${Date.now()}`,
+            typeAction: proposedAction!.typeAction,
+            parametres: proposedAction!.parametres,
+          }
+        ]);
+      } else {
+        setShowSuggestions(true);
+      }
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Erreur Gemini inconnue';
+      setGeminiError(errMsg);
+      addAssistantMessage(`⚠️ Erreur IA : ${errMsg.includes('key') ? 'Clé API invalide.' : errMsg}`);
+      setShowSuggestions(true);
     } finally {
       setLoading(false);
     }
@@ -178,97 +265,56 @@ export default function CopiloteWidget() {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
 
-    // Try local action first (navigation / form filling)
-    if (handleNavigationOrFormCompletion(userMsg)) {
-      return;
-    }
+    // Try local shortcuts first
+    if (handleNavigationOrFormCompletion(userMsg)) return;
 
-    setLoading(true);
+    await sendToGemini(userMsg);
+  };
 
-    try {
-      const res = await fetch('/api/ia/copilote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, conversationId }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setConversationId(data.conversationId);
-        
-        // Remplace les messages par l'historique complet
-        if (data.messages) {
-          setMessages(data.messages);
-          const lastMsg = data.messages[data.messages.length - 1];
-          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.includes('Quel secteur')) {
-            setShowSuggestions(false);
-          } else {
-            setShowSuggestions(true);
-          }
-        }
-
-        // Si une action est proposée, on l'ajoute comme élément spécial
-        if (data.proposedAction) {
-          setMessages(prev => [
-            ...prev,
-            {
-              role: 'action_proposal',
-              actionId: data.proposedAction.id,
-              typeAction: data.proposedAction.typeAction,
-              parametres: JSON.parse(data.proposedAction.parametres || '{}'),
-            }
-          ]);
-        }
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: "Désolé, je rencontre des difficultés pour analyser votre requête." }]);
-      }
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Erreur de connexion réseau." }]);
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectSuggestion = async (text: string) => {
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    if (handleNavigationOrFormCompletion(text)) return;
+    await sendToGemini(text);
   };
 
   const handleConfirmAction = async (actionId: string) => {
-    setExecutingActionId(actionId);
-    try {
-      const res = await fetch('/api/ia/copilote/executer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionId }),
-      });
+    const actionMsg = messages.find(m => m.actionId === actionId);
+    if (!actionMsg) return;
 
-      if (res.ok) {
-        const data = await res.json();
-        // Supprime la proposition d'action et affiche le résultat
-        setMessages(prev => [
-          ...prev.filter(m => m.actionId !== actionId),
-          { role: 'assistant', content: `✅ **Action exécutée** : ${data.resultat}` }
-        ]);
-        setShowSuggestions(true);
-      } else {
-        alert("Erreur lors de l'exécution de l'action.");
-      }
-    } catch (e) {
-      alert("Erreur réseau.");
-    } finally {
-      setExecutingActionId(null);
-    }
+    setMessages(prev => prev.filter(m => m.actionId !== actionId));
+
+    await executeProposedAction({
+      typeAction: actionMsg.typeAction!,
+      parametres: actionMsg.parametres || {},
+    });
+
+    setShowSuggestions(true);
+  };
+
+  const handleRejectAction = (actionId: string) => {
+    setMessages(prev => prev.filter(m => m.actionId !== actionId));
+    addAssistantMessage('Action annulée. Comment puis-je vous aider autrement ?');
+    setShowSuggestions(true);
   };
 
   return (
     <>
-      {/* Bouton Flottant (Bottom-Right) */}
+      {/* Floating Button */}
       <button
+        id="copilote-toggle-btn"
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center text-white shadow-xl shadow-blue-500/20 hover:scale-105 transition-all print:hidden"
+        title="Copilote IA"
       >
-        {isOpen ? <X className="h-5.5 w-5.5 animate-spin-once" /> : <Sparkles className="h-5.5 w-5.5" />}
+        {isOpen ? <X className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
       </button>
 
-      {/* Drawer de Chat */}
+      {/* Chat Drawer */}
       {isOpen && (
-        <div className="fixed bottom-20 right-6 z-50 w-80 md:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[500px] overflow-hidden print:hidden text-xs">
+        <div
+          id="copilote-drawer"
+          className="fixed bottom-20 right-6 z-50 w-80 md:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[520px] overflow-hidden print:hidden text-xs"
+        >
           {/* Header */}
           <div className="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
             <div className="flex items-center gap-2">
@@ -277,7 +323,10 @@ export default function CopiloteWidget() {
               </div>
               <div>
                 <span className="font-bold text-white block">Copilote Commercial IA</span>
-                <span className="text-[9px] text-slate-500">Pilotage par langage naturel</span>
+                <span className="text-[9px] text-blue-400/70 flex items-center gap-1">
+                  <Zap className="h-2.5 w-2.5" />
+                  Gemini 2.5 Flash · SIRENE live
+                </span>
               </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
@@ -289,20 +338,37 @@ export default function CopiloteWidget() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/20">
             {messages.map((m, idx) => {
               if (m.role === 'action_proposal') {
+                const actionLabels: Record<string, string> = {
+                  recherche_entreprise: '🔍 Recherche SIRENE',
+                  inscrire_sequence: '📧 Inscrire dans une séquence',
+                  envoyer_email: '✉️ Envoyer un email',
+                  navigation: '🧭 Navigation',
+                  ajouter_prospect: '📝 Ajouter un prospect',
+                };
                 return (
                   <div key={idx} className="p-3 bg-blue-950/20 border border-blue-500/20 rounded-xl space-y-2 text-slate-300">
                     <div className="flex items-center gap-1.5 font-bold text-blue-400">
                       <AlertCircle className="h-4 w-4" />
-                      Validation requise
+                      Action proposée
                     </div>
                     <p className="text-[10px] leading-relaxed">
-                      L'IA propose d'exécuter : **{m.typeAction}** avec les paramètres {JSON.stringify(m.parametres)}.
+                      {actionLabels[m.typeAction!] || m.typeAction}
+                      {m.parametres && Object.keys(m.parametres).length > 0 && (
+                        <span className="text-slate-500 ml-1">
+                          ({Object.entries(m.parametres).map(([k, v]) => `${k}: ${v}`).join(', ')})
+                        </span>
+                      )}
                     </p>
                     <div className="flex gap-2 justify-end pt-1">
                       <button
-                        onClick={() => handleConfirmAction(m.actionId)}
-                        disabled={executingActionId === m.actionId}
-                        className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-[9px] font-bold text-white flex items-center gap-1 disabled:opacity-50"
+                        onClick={() => handleRejectAction(m.actionId!)}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[9px] font-medium text-slate-300"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={() => handleConfirmAction(m.actionId!)}
+                        className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-[9px] font-bold text-white flex items-center gap-1"
                       >
                         <Check className="h-3 w-3" />
                         Confirmer
@@ -320,35 +386,37 @@ export default function CopiloteWidget() {
                   }`}>
                     {isBot ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
                   </div>
-
-                  <div className={`p-3 rounded-2xl max-w-[75%] leading-relaxed whitespace-pre-wrap ${
-                    isBot ? 'bg-slate-900/50 border border-slate-850 text-slate-200' : 'bg-blue-600 text-white'
+                  <div className={`p-3 rounded-2xl max-w-[78%] leading-relaxed whitespace-pre-wrap break-words ${
+                    isBot ? 'bg-slate-900/50 border border-slate-800 text-slate-200' : 'bg-blue-600 text-white'
                   }`}>
                     {m.content}
                   </div>
                 </div>
               );
             })}
+
             {loading && (
               <div className="flex gap-2.5">
                 <div className="h-7 w-7 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 text-blue-400">
                   <Bot className="h-4 w-4" />
                 </div>
-                <div className="p-3 bg-slate-900/50 border border-slate-850 rounded-2xl flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" />
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce delay-75" />
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce delay-150" />
+                <div className="p-3 bg-slate-900/50 border border-slate-800 rounded-2xl flex items-center gap-2 text-slate-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                  <span className="text-[10px]">Gemini analyse votre demande...</span>
                 </div>
               </div>
             )}
+
+            {/* Suggestion Bubbles */}
             {!loading && showSuggestions && (
               <div className="flex flex-wrap gap-2 pt-2">
                 {SUGGESTIONS.map((s, i) => (
                   <button
                     key={i}
+                    id={`suggestion-${i}`}
                     type="button"
                     onClick={() => handleSelectSuggestion(s.text)}
-                    className="px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/20 text-slate-300 hover:text-white transition-all text-[10px] font-medium shadow-sm flex items-center gap-1.5 text-left"
+                    className="px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/20 text-slate-300 hover:text-white transition-all text-[10px] font-medium shadow-sm flex items-center gap-1.5"
                   >
                     <span>{s.icon}</span>
                     <span>{s.label}</span>
@@ -356,26 +424,34 @@ export default function CopiloteWidget() {
                 ))}
               </div>
             )}
+
+            {geminiError && (
+              <div className="text-[9px] text-red-400 bg-red-950/20 border border-red-500/20 rounded-lg p-2">
+                ⚠️ {geminiError}
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Form Input */}
+          {/* Input */}
           <form onSubmit={handleSendMessage} className="p-3 bg-slate-950 border-t border-slate-800 flex gap-2">
             <input
+              id="copilote-input"
               type="text"
-              required
               disabled={loading}
-              placeholder="Écrivez votre commande..."
+              placeholder={loading ? 'Gemini réfléchit...' : 'Écrivez votre commande...'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="flex-1 rounded-xl border border-slate-850 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="flex-1 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 text-[11px]"
             />
             <button
+              id="copilote-send-btn"
               type="submit"
-              disabled={loading}
-              className="h-9 w-9 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shrink-0 disabled:opacity-50"
+              disabled={loading || !input.trim()}
+              className="h-9 w-9 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shrink-0 disabled:opacity-50 transition-colors"
             >
-              <Send className="h-4 w-4" />
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </form>
         </div>

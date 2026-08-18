@@ -48,6 +48,9 @@ export async function POST(req: Request) {
     let responseText = '';
     let proposedAction: any = null;
 
+    // NOTE: This route is now a fallback. The CopiloteWidget calls Gemini directly.
+    const lowerMessage = message.toLowerCase();
+
     // Check if previous message asked for a sector and we need to capture the text input
     const wasAskedForSector = messagesList.length >= 3 && 
       messagesList[messagesList.length - 2]?.role === 'assistant' && 
