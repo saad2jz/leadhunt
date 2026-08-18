@@ -531,16 +531,18 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           prospects.unshift({
             id: c.siren,
             nom: c.nom,
-            adresse: c.adresse,
-            ville: c.adresse?.split(',')[1]?.trim() || 'Paris',
-            secteur: c.libelleSecteur,
-            taille: c.trancheEffectif,
+            adresse: c.adresse || 'Adresse non renseignée',
+            ville: c.ville || 'Paris',
+            secteur: c.libelleSecteur || 'Services',
+            taille: c.trancheEffectif || 'NC',
             statut: 'À appeler',
-            score: 75,
+            score: c.score || 75,
             telephone: '0100000000',
             telephoneVerifie: true,
             email: `contact@${c.nom.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
             emailVerifie: true,
+            latitude: c.latitude || 48.8566,
+            longitude: c.longitude || 2.3522,
             contacts: [
               { id: 'ct_' + Date.now(), nom: c.dirigeantNom, fonction: c.dirigeantRole }
             ],
@@ -1137,6 +1139,45 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           const timingScore = Math.max(89, 96 - idx * 2);
           const canal = signal === 'levees_fonds' ? 'linkedin' : (idx % 2 === 0 ? 'email' : 'linkedin');
 
+          // Calculer des coordonnées réalistes pour la cartographie GPS
+          let latitude = 48.8566; // Paris par défaut
+          let longitude = 2.3522;
+          const vLower = ville.toLowerCase();
+          if (vLower.includes('lyon')) {
+            latitude = 45.7640;
+            longitude = 4.8357;
+          } else if (vLower.includes('marseille')) {
+            latitude = 43.2965;
+            longitude = 5.3698;
+          } else if (vLower.includes('bordeaux')) {
+            latitude = 44.8378;
+            longitude = -0.5792;
+          } else if (vLower.includes('nantes')) {
+            latitude = 47.2184;
+            longitude = -1.5536;
+          } else if (vLower.includes('toulouse')) {
+            latitude = 43.6047;
+            longitude = 1.4442;
+          } else if (vLower.includes('lille')) {
+            latitude = 50.6292;
+            longitude = 3.0573;
+          } else if (vLower.includes('strasbourg')) {
+            latitude = 48.5734;
+            longitude = 7.7521;
+          } else if (vLower.includes('nice')) {
+            latitude = 43.7102;
+            longitude = 7.2620;
+          } else if (vLower.includes('rennes')) {
+            latitude = 48.1173;
+            longitude = -1.6778;
+          } else if (vLower.includes('montpellier')) {
+            latitude = 43.6108;
+            longitude = 3.8767;
+          }
+          // Ajouter une légère dispersion aléatoire pour que les pins ne se superposent pas
+          latitude += (Math.random() - 0.5) * 0.04;
+          longitude += (Math.random() - 0.5) * 0.04;
+
           return {
             id: `et_${siren || idx}_${Date.now()}`,
             nom,
@@ -1146,6 +1187,8 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
             effectif,
             ville,
             codePostal: cp,
+            latitude,
+            longitude,
             fitScore,
             fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: true, tailleMatch: true, decideurMatch: true, note: "Score d'affinité optimal : adéquation totale de l'ICP." }),
             timingScore,

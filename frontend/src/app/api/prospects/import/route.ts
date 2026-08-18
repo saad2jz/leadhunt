@@ -15,6 +15,8 @@ const importSchema = z.object({
       libelleSecteur: z.string().optional(),
       dirigeantNom: z.string().optional(),
       dirigeantRole: z.string().optional(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
     })
   ),
 });
@@ -47,10 +49,10 @@ export async function POST(req: Request) {
           continue; // Déjà importé
         }
 
-        // Géocodage de l'adresse
-        let latitude: number | null = null;
-        let longitude: number | null = null;
-        if (comp.adresse) {
+        // Géocodage de l'adresse (priorité aux coordonnées reçues directement)
+        let latitude: number | null = comp.latitude || null;
+        let longitude: number | null = comp.longitude || null;
+        if (!latitude && comp.adresse) {
           try {
             const geo = await geocodeAddress(comp.adresse);
             if (geo) {

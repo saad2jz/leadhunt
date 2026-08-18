@@ -195,9 +195,16 @@ export default function ProspectionSearchPage() {
         body: JSON.stringify({
           companies: [{
             nom: company.nom,
-            siren: company.entrepriseCache?.siren || `MOCK-${Date.now()}`,
+            siren: company.siren || `MOCK-${Date.now()}`,
             dirigeantNom: company.decideurs[0]?.nom || 'Non renseigné',
             dirigeantRole: company.decideurs[0]?.fonction || 'Dirigeant',
+            adresse: company.codePostal ? `${company.codePostal} ${company.ville}` : company.ville,
+            ville: company.ville || 'Paris',
+            libelleSecteur: company.secteurLabel || company.secteur || 'Services',
+            trancheEffectif: company.effectif || 'NC',
+            score: company.fitScore || 75,
+            latitude: company.latitude,
+            longitude: company.longitude,
           }]
         }),
       });
