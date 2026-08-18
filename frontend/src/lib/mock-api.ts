@@ -19,6 +19,7 @@ const STORAGE_KEYS = {
   CAMPAGNES: 'leadhunt_mock_campagnes',
   ETAPES: 'leadhunt_mock_etapes',
   PROSPECT_CAMPAGNE: 'leadhunt_mock_prospect_campagnes',
+  PROSPECTION: 'leadhunt_mock_prospection',
 };
 
 // Seed initial data if localStorage is empty
@@ -786,6 +787,134 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           besoinGenere
         }
       };
+    }
+
+    case 'prospection/lancer': {
+      const searches = getItems(STORAGE_KEYS.PROSPECTION);
+      if (method === 'POST') {
+        const newSearch = {
+          id: 'search_' + Date.now(),
+          entryType: body.entryType,
+          entryValue: body.entryValue,
+          besoin: body.besoin,
+          statut: 'en_cours',
+          createdAt: Date.now(), // timestamp to calculate delay client-side
+        };
+        searches.push(newSearch);
+        setItems(STORAGE_KEYS.PROSPECTION, searches);
+        return { success: true, rechercheId: newSearch.id, message: 'Recherche lancée avec succès.' };
+      }
+
+      // GET method: Retrieve search status/results
+      const id = queryParams.get('id');
+      const search = searches.find(s => s.id === id);
+      if (!search) return { error: 'Recherche introuvable' };
+
+      // Simulate a background worker: if 3 seconds have passed since creation, mark as finished!
+      if (search.statut === 'en_cours' && Date.now() - search.createdAt > 3000) {
+        search.statut = 'terminee';
+        
+        // Populate mock results data
+        search.buyerPersonas = [
+          {
+            id: 'bp_' + Date.now(),
+            roleTarget: search.besoin?.rolesDecideurs?.[0] || 'CTO',
+            motivations: JSON.stringify([
+              'Gagner du temps sur la prospection froide.',
+              'Automatiser les séquences email de relance.'
+            ]),
+            objections: JSON.stringify([
+              'Crainte du bounce ou d\'atterrir en spam.',
+              'Complexité de configuration technique.'
+            ]),
+            vocabulaire: JSON.stringify(['Relance', 'Ciblage', 'Waterfall', 'Cold Email']),
+            kpis: JSON.stringify(['Taux d\'ouverture', 'Réponses', 'RDV pris'])
+          }
+        ];
+
+        const matchIndustry = search.besoin?.secteurs?.[0] || 'Logiciel';
+        search.entreprises = [
+          {
+            id: 'et1',
+            nom: 'Alpha Services',
+            secteur: '70.22Z',
+            effectif: '45 salariés',
+            ville: 'Paris',
+            fitScore: 92,
+            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: true }),
+            timingScore: 85,
+            timingDetail: JSON.stringify({ signalDetecte: 'recrutement' }),
+            statutCRM: 'nouveau',
+            decideurs: [
+              {
+                id: 'dec1',
+                nom: 'Sarah Dubreuil',
+                fonction: search.besoin?.rolesDecideurs?.[0] || 'Directeur Commercial',
+                linkedinUrl: 'https://www.linkedin.com/in/sarah-dubreuil',
+                emailTrouve: 'sarah.d@alphaservices.fr',
+                emailStatutVerif: 'verifie',
+                emailProbabiliteBounce: 0.02,
+                telephoneTrouve: '0612345678',
+                telephoneType: 'mobile',
+                telephoneActif: true,
+                confiance: 95,
+                source: 'Waterfall cascade'
+              }
+            ],
+            planApproche: {
+              canalRecommande: 'email',
+              angleAccroche: 'Recrutement commercial actif',
+              messageDraft: `Bonjour Sarah,\n\nJ'ai remarqué qu'Alpha Services recrute activement sur Paris.\n\nNotre solution B2B automatisée pourrait vous aider à booster vos ventes.\n\nSeriez-vous disponible 10 min cette semaine ?\n\nCordialement,\nJean Commercial`
+            }
+          },
+          {
+            id: 'et2',
+            nom: 'Beta Tech',
+            secteur: '62.01Z',
+            effectif: '85 salariés',
+            ville: 'Lyon',
+            fitScore: 88,
+            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: false }),
+            timingScore: 90,
+            timingDetail: JSON.stringify({ signalDetecte: 'levees_fonds' }),
+            statutCRM: 'nouveau',
+            decideurs: [
+              {
+                id: 'dec2',
+                nom: 'Marc Lemaire',
+                fonction: search.besoin?.rolesDecideurs?.[1] || 'Gérant',
+                linkedinUrl: 'https://www.linkedin.com/in/marc-lemaire',
+                emailTrouve: 'm.lemaire@betatech.com',
+                emailStatutVerif: 'risque',
+                emailProbabiliteBounce: 0.15,
+                telephoneTrouve: '0478000000',
+                telephoneType: 'direct',
+                telephoneActif: true,
+                confiance: 82,
+                source: 'Hunter.io + Cascade'
+              }
+            ],
+            planApproche: {
+              canalRecommande: 'linkedin',
+              angleAccroche: 'Optimisation de la productivité ESN',
+              messageDraft: `Bonjour Marc,\n\nSuite à votre récente levée de fonds chez Beta Tech, je serais ravi d'échanger sur l'automatisation de vos flux prospection.\n\nCordialement,\nJean`
+            }
+          }
+        ];
+
+        // Update the item in the list
+        const idx = searches.findIndex(s => s.id === id);
+        if (idx > -1) {
+          searches[idx] = search;
+          setItems(STORAGE_KEYS.PROSPECTION, searches);
+        }
+      }
+
+      return { success: true, recherche: search };
+    }
+
+    case 'prospection/feedback': {
+      return { success: true };
     }
 
     case 'campagnes/relance/du-jour': {
