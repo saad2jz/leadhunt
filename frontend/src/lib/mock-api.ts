@@ -20,6 +20,8 @@ const STORAGE_KEYS = {
   ETAPES: 'leadhunt_mock_etapes',
   PROSPECT_CAMPAGNE: 'leadhunt_mock_prospect_campagnes',
   PROSPECTION: 'leadhunt_mock_prospection',
+  COPILOTE_CONVS: 'leadhunt_mock_copilote_convs',
+  COPILOTE_ACTIONS: 'leadhunt_mock_copilote_actions',
 };
 
 // Seed initial data if localStorage is empty
@@ -564,6 +566,145 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
 
     case 'ia/analyser': {
       return { success: true, analyse: 'Analyse IA générée avec succès pour ce prospect.' };
+    }
+
+    case 'ia/copilote': {
+      const convs = getItems(STORAGE_KEYS.COPILOTE_CONVS);
+      const actions = getItems(STORAGE_KEYS.COPILOTE_ACTIONS);
+      let convId = body.conversationId;
+      let conv = convs.find(c => c.id === convId);
+
+      if (!conv) {
+        conv = {
+          id: 'conv_' + Date.now(),
+          messages: JSON.stringify([
+            { role: 'assistant', content: "Bonjour ! Je suis votre copilote commercial IA. Je peux lancer des recherches SIRENE, inscrire des prospects à des campagnes, ou vérifier vos statistiques. Que puis-je faire pour vous ?" }
+          ])
+        };
+        convs.push(conv);
+        setItems(STORAGE_KEYS.COPILOTE_CONVS, convs);
+      }
+
+      convId = conv.id;
+      const messagesList = JSON.parse(conv.messages || '[]');
+      messagesList.push({ role: 'user', content: body.message });
+
+      let responseText = '';
+      let proposedAction: any = null;
+      const lowerMessage = body.message.toLowerCase();
+
+      if (lowerMessage.includes('recherche') || lowerMessage.includes('trouve') || lowerMessage.includes('sirene')) {
+        let target = 'Logiciel';
+        if (lowerMessage.includes('btp')) target = 'BTP';
+        else if (lowerMessage.includes('restaurant')) target = 'Restauration';
+        else if (lowerMessage.includes('coiffeur')) target = 'Coiffure';
+
+        responseText = `Je comprends que vous souhaitez sourcer de nouvelles entreprises dans le secteur : **${target}**. Je propose de lancer une recherche SIRENE ciblée.`;
+        proposedAction = {
+          id: 'act_' + Date.now(),
+          conversationId: convId,
+          typeAction: 'recherche_entreprise',
+          parametres: JSON.stringify({ secteur: target, ville: 'Paris' }),
+          statut: 'proposée',
+        };
+      } else if (lowerMessage.includes('inscrire') || lowerMessage.includes('séquence') || lowerMessage.includes('sequence')) {
+        responseText = "Je propose d'inscrire vos prospects qualifiés récents à votre séquence d'outreach email active.";
+        proposedAction = {
+          id: 'act_' + Date.now(),
+          conversationId: convId,
+          typeAction: 'inscrire_sequence',
+          parametres: JSON.stringify({ sequenceId: 'default' }),
+          statut: 'proposée',
+        };
+      } else if (lowerMessage.includes('mail') || lowerMessage.includes('email') || lowerMessage.includes('envoyer')) {
+        responseText = "Je propose d'envoyer un email de relance à vos prospects restés sans réponse depuis 7 jours.";
+        proposedAction = {
+          id: 'act_' + Date.now(),
+          conversationId: convId,
+          typeAction: 'envoyer_email',
+          parametres: JSON.stringify({ delayDays: 7 }),
+          statut: 'proposée',
+        };
+      } else if (lowerMessage.includes('combien') || lowerMessage.includes('stat') || lowerMessage.includes('leads') || lowerMessage.includes('prospect')) {
+        const prospects = getItems(STORAGE_KEYS.PROSPECTS);
+        const count = prospects.length;
+        const rdvCount = prospects.filter(p => p.statut === 'RDV pris').length;
+        responseText = `Vous avez actuellement **${count}** prospects dans votre CRM, dont **${rdvCount}** avec un rendez-vous fixé. Votre performance est stable !`;
+      } else {
+        responseText = "Bonjour ! Je suis votre copilote commercial IA. Je peux chercher de nouveaux prospects, les inscrire à des campagnes d'outreach ou analyser vos statistiques. Décrivez-moi votre besoin !";
+      }
+
+      messagesList.push({ role: 'assistant', content: responseText });
+      conv.messages = JSON.stringify(messagesList);
+      
+      const cIdx = convs.findIndex(c => c.id === convId);
+      if (cIdx > -1) {
+        convs[cIdx] = conv;
+        setItems(STORAGE_KEYS.COPILOTE_CONVS, convs);
+      }
+
+      if (proposedAction) {
+        actions.push(proposedAction);
+        setItems(STORAGE_KEYS.COPILOTE_ACTIONS, actions);
+      }
+
+      return {
+        success: true,
+        conversationId: convId,
+        messages: messagesList,
+        proposedAction,
+      };
+    }
+
+    case 'ia/copilote/executer': {
+      const actions = getItems(STORAGE_KEYS.COPILOTE_ACTIONS);
+      const action = actions.find(a => a.id === body.actionId);
+      if (!action) return { error: 'Action introuvable' };
+
+      let resultMsg = 'Action exécutée.';
+      const params = JSON.parse(action.parametres || '{}');
+
+      if (action.typeAction === 'recherche_entreprise') {
+        const searches = getItems(STORAGE_KEYS.PROSPECTION);
+        const newSearch = {
+          id: 'search_' + Date.now(),
+          entryType: 'motscles',
+          entryValue: params.secteur || 'Logiciel',
+          besoin: {
+            solutionType: `${params.secteur || 'Logiciel'} B2B`,
+            tailleMin: 1, tailleMax: 200,
+            zonesGeo: ['Toute la France'],
+            secteurs: ['70.22Z'],
+            budgetType: 'Standard',
+            signauxAchat: ['recrutement'],
+            rolesDecideurs: ['Gérant'],
+            motsClesSuggeres: params.secteur || 'Logiciel',
+            maxEntitesIA: 5,
+          },
+          statut: 'en_cours',
+          createdAt: Date.now(),
+        };
+        searches.push(newSearch);
+        setItems(STORAGE_KEYS.PROSPECTION, searches);
+        resultMsg = `Recherche lancée avec succès pour le secteur ${params.secteur}. Identifiant recherche: ${newSearch.id}`;
+      } else if (action.typeAction === 'inscrire_sequence') {
+        resultMsg = `Prospects inscrits à la séquence outreach avec succès.`;
+      } else if (action.typeAction === 'envoyer_email') {
+        resultMsg = `Relances envoyées avec succès.`;
+      }
+
+      action.statut = 'exécutée';
+      action.resultat = resultMsg;
+      const aIdx = actions.findIndex(a => a.id === action.id);
+      if (aIdx > -1) {
+        actions[aIdx] = action;
+        setItems(STORAGE_KEYS.COPILOTE_ACTIONS, actions);
+      }
+
+      return {
+        success: true,
+        resultat: resultMsg,
+      };
     }
 
     case 'signaux/verifier': {
