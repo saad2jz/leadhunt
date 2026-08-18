@@ -27,6 +27,29 @@ function seedDatabase() {
     }
   };
 
+  // Data migration: ensure all existing prospects in localStorage have the contacts array
+  try {
+    const existing = localStorage.getItem(STORAGE_KEYS.PROSPECTS);
+    if (existing) {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        let modified = false;
+        const migrated = parsed.map(p => {
+          if (!p.contacts) {
+            modified = true;
+            return { ...p, contacts: [] };
+          }
+          return p;
+        });
+        if (modified) {
+          localStorage.setItem(STORAGE_KEYS.PROSPECTS, JSON.stringify(migrated));
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error during prospects migration:', e);
+  }
+
   // Seed Prospects
   getOrSet(STORAGE_KEYS.PROSPECTS, [
     {
@@ -47,6 +70,7 @@ function seedDatabase() {
       latitude: 48.8566,
       longitude: 2.3522,
       createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      contacts: [],
     },
     {
       id: 'p2',
@@ -66,6 +90,7 @@ function seedDatabase() {
       latitude: 48.8700,
       longitude: 2.3000,
       createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      contacts: [],
     },
     {
       id: 'p3',
@@ -85,6 +110,7 @@ function seedDatabase() {
       latitude: 48.8737,
       longitude: 2.3364,
       createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      contacts: [],
     }
   ]);
 
@@ -231,12 +257,38 @@ export function initMockApi() {
 
 // Intercept specific routes
 function handleMockRoute(url: string, init?: RequestInit): any {
-  const path = url.split('?')[0].split('/api/')[1];
+  // Normalize path and remove any trailing slash
+  let path = url.split('?')[0].split('/api/')[1];
+  if (path.endsWith('/')) {
+    path = path.slice(0, -1);
+  }
   const queryParams = new URLSearchParams(url.includes('?') ? url.split('?')[1] : '');
   const method = init?.method?.toUpperCase() || 'GET';
-  const body = init?.body ? JSON.parse(init.body as string) : null;
+  
+  let body = null;
+  if (init?.body) {
+    if (typeof init.body === 'string') {
+      try {
+        body = JSON.parse(init.body);
+      } catch (e) {
+        body = init.body;
+      }
+    } else {
+      body = init.body;
+    }
+  }
 
-  const getItems = (key: string): any[] => JSON.parse(localStorage.getItem(key) || '[]');
+  const getItems = (key: string): any[] => {
+    try {
+      const val = localStorage.getItem(key);
+      if (!val) return [];
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error(`Error parsing localStorage key ${key}:`, e);
+      return [];
+    }
+  };
   const setItems = (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data));
 
   switch (path) {
