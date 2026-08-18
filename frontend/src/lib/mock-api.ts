@@ -713,7 +713,19 @@ function handleMockRoute(url: string, init?: RequestInit): any {
           }
         } else if (method === 'GET') {
           const prospect = prospects.find(p => p.id === id);
-          if (prospect) return { success: true, prospect };
+          if (prospect) {
+            return {
+              success: true,
+              prospect: {
+                contacts: [],
+                devis: [],
+                signauxEmbauche: [],
+                interactions: [],
+                sequences: [],
+                ...prospect
+              }
+            };
+          }
         }
       }
       

@@ -723,11 +723,11 @@ export default function ProspectDetailPage() {
                   </button>
                 </div>
 
-                {prospect.signauxEmbauche?.length === 0 ? (
+                {!prospect.signauxEmbauche || prospect.signauxEmbauche.length === 0 ? (
                   <p className="text-slate-500 text-xs italic">Aucun signal d'embauche actif détecté.</p>
                 ) : (
                   <div className="space-y-2 text-xs">
-                    {prospect.signauxEmbauche.map((sig: any) => (
+                    {(prospect.signauxEmbauche || []).map((sig: any) => (
                       <div key={sig.id} className="p-2.5 bg-slate-950 border border-slate-850 rounded-xl flex justify-between items-center gap-2">
                         <div className="overflow-hidden">
                           <span className="font-semibold text-slate-200 block truncate">{sig.titrePoste}</span>
@@ -764,7 +764,7 @@ export default function ProspectDetailPage() {
                   <p className="text-slate-500 text-xs italic">Aucun devis créé pour ce prospect.</p>
                 ) : (
                   <div className="space-y-2 text-xs">
-                    {prospect.devis.map((dev: any) => (
+                    {(prospect.devis || []).map((dev: any) => (
                       <div key={dev.id} className="p-2.5 bg-slate-950 border border-slate-850 rounded-xl flex justify-between items-center gap-2">
                         <div className="overflow-hidden">
                           <span className="font-semibold text-slate-200 block truncate">{dev.numero}</span>
@@ -896,11 +896,11 @@ export default function ProspectDetailPage() {
                 )}
 
                 {/* Table contacts */}
-                {prospect.contacts.length === 0 ? (
+                {!prospect.contacts || prospect.contacts.length === 0 ? (
                   <div className="text-slate-500 text-xs py-2">Aucun décideur renseigné.</div>
                 ) : (
                   <div className="divide-y divide-slate-800/40 text-xs">
-                    {prospect.contacts.map((contact: any) => (
+                    {(prospect.contacts || []).map((contact: any) => (
                       <div key={contact.id} className="py-3 flex justify-between items-center">
                         <div className="space-y-1">
                           <span className="font-bold text-white block">{contact.nom}</span>
@@ -1049,11 +1049,11 @@ export default function ProspectDetailPage() {
                 </form>
 
                 {/* Liste chronologique */}
-                {prospect.interactions.length === 0 ? (
+                {!prospect.interactions || prospect.interactions.length === 0 ? (
                   <div className="text-slate-500 text-xs py-2">Aucun échange loggé.</div>
                 ) : (
                   <div className="relative border-l border-slate-800 ml-3 pl-6 space-y-6 text-xs">
-                    {prospect.interactions.map((inter: any) => (
+                    {(prospect.interactions || []).map((inter: any) => (
                       <div key={inter.id} className="relative">
                         {/* Dot */}
                         <div className="absolute -left-[30px] top-0.5 h-3.5 w-3.5 rounded-full border border-blue-500 bg-slate-950 flex items-center justify-center">
