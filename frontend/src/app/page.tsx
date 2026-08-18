@@ -387,7 +387,7 @@ export default function DashboardPage() {
                 {recentProspects.map((prospect: any) => (
                   <div key={prospect.id} className="py-3 flex justify-between items-center">
                     <div>
-                      <Link href={`/prospects/${prospect.id}`} className="font-bold text-white hover:text-blue-400 block">
+                      <Link href={`/prospects/detail/?id=${prospect.id}`} className="font-bold text-white hover:text-blue-400 block">
                         {prospect.nom}
                       </Link>
                       <span className="text-slate-500 text-[10px] block mt-0.5">SIREN : {prospect.siren || 'N/A'}</span>

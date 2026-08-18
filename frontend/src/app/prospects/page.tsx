@@ -420,7 +420,7 @@ export default function ProspectsPage() {
                         >
                           <div className="flex justify-between items-start gap-2">
                             <Link 
-                              href={`/prospects/${prospect.id}`}
+                              href={`/prospects/detail/?id=${prospect.id}`}
                               className="font-bold text-sm text-white hover:text-blue-400 transition-colors block truncate"
                             >
                               {prospect.nom}

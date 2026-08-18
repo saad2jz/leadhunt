@@ -350,7 +350,7 @@ export default function KanbanBoardPage() {
                   <button 
                     onClick={() => {
                       setSelectedCard(null);
-                      router.push(`/prospects/${selectedCard.prospect.id}`);
+                      router.push(`/prospects/detail/?id=${selectedCard.prospect.id}`);
                     }}
                     className="text-xs text-blue-400 hover:underline mt-1 block"
                   >

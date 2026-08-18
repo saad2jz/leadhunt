@@ -7,12 +7,12 @@ import {
   FileText, Plus, Trash2, Save, Printer, ArrowLeft,
   X, Check, Edit3, CircleDollarSign 
 } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function DevisCreatorPage() {
-  const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = searchParams.get('id') as string;
 
   const [prospect, setProspect] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -156,7 +156,7 @@ export default function DevisCreatorPage() {
           {/* Header print-hidden */}
           <div className="flex justify-between items-center print:hidden">
             <button 
-              onClick={() => router.push(`/prospects/${id}`)}
+              onClick={() => router.push(`/prospects/detail/?id=${id}`)}
               className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-all"
             >
               <ArrowLeft className="h-3.5 w-3.5" />

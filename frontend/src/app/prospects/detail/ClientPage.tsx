@@ -9,13 +9,13 @@ import {
   Building, User, Mail, Phone, Calendar, Star, Edit3, Trash2, 
   Plus, MessageSquare, AlertTriangle, Check, Upload, ArrowLeft, X, Layers, Cpu, ExternalLink, Link2, FileText
 } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function ProspectDetailPage() {
-  const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { data: session } = useSession();
-  const id = params.id as string;
+  const id = searchParams.get('id') as string;
 
   const [prospect, setProspect] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -753,7 +753,7 @@ export default function ProspectDetailPage() {
                   </h3>
                   <button
                     type="button"
-                    onClick={() => router.push(`/prospects/${id}/devis`)}
+                    onClick={() => router.push(`/prospects/detail/devis/?id=${id}`)}
                     className="text-[10px] text-blue-400 hover:text-blue-300 font-bold"
                   >
                     + Gérer

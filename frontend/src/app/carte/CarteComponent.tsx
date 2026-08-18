@@ -119,7 +119,7 @@ export default function CarteComponent({ prospects }: { prospects: Prospect[] })
                     </span>
                   </div>
                   <Link 
-                    href={`/prospects/${p.id}`}
+                    href={`/prospects/detail/?id=${p.id}`}
                     className="block text-center mt-2 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold"
                   >
                     Voir la fiche
