@@ -240,6 +240,7 @@ export default function CopiloteWidget() {
                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce delay-150" />
                 </div>
               </div>
+            )}
             {!loading && showSuggestions && (
               <div className="flex flex-wrap gap-2 pt-2">
                 {SUGGESTIONS.map((s, i) => (
