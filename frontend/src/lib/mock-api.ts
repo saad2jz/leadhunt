@@ -1219,6 +1219,32 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           latitude += (Math.random() - 0.5) * 0.04;
           longitude += (Math.random() - 0.5) * 0.04;
 
+          // Generate a tailored pitch based on the company's solutionType
+          let sectorPitch = `notre solution de ${solutionType || 'services B2B'}`;
+          const solLower = solutionType.toLowerCase();
+
+          if (solLower.includes('alimentaire') || solLower.includes('hcr') || solLower.includes('boisson') || solLower.includes('apéritif')) {
+            sectorPitch = "nos gammes de boissons artisanales, coffrets apéritifs et produits du terroir de qualité pour les professionnels, événements d'entreprise et cadeaux d'affaires";
+          } else if (solLower.includes('btp') || solLower.includes('travaux') || solLower.includes('construction')) {
+            sectorPitch = "nos prestations de travaux, rénovation de bâtiments et services techniques pour les chantiers professionnels";
+          } else if (solLower.includes('assurance') || solLower.includes('prévoyance') || solLower.includes('mutuelle')) {
+            sectorPitch = "nos solutions de couverture santé collective, prévoyance et garanties RC Pro sur-mesure pour protéger vos équipes et vos locaux";
+          } else if (solLower.includes('logiciel') || solLower.includes('saas') || solLower.includes('tech')) {
+            sectorPitch = `notre plateforme logicielle pour optimiser et automatiser vos flux de travail quotidiens`;
+          } else if (solLower.includes('marketing') || solLower.includes('communication') || solLower.includes('agence')) {
+            sectorPitch = "nos services d'accompagnement en visibilité digitale, branding de marque et campagnes d'acquisition de prospects";
+          } else if (solLower.includes('formation') || solLower.includes('compétence')) {
+            sectorPitch = "nos programmes de formation continue et ateliers certifiants pour développer les compétences de vos équipes";
+          } else if (solLower.includes('conseil') || solLower.includes('cabinet') || solLower.includes('audit')) {
+            sectorPitch = "nos services d'accompagnement stratégique, audit organisationnel et conseil en gestion pour sécuriser votre croissance";
+          } else if (solLower.includes('transport') || solLower.includes('logistique')) {
+            sectorPitch = "nos solutions d'acheminement, livraison express et gestion logistique pour optimiser vos flux de marchandises";
+          } else if (solLower.includes('santé') || solLower.includes('médical')) {
+            sectorPitch = "nos équipements spécialisés et solutions d'accompagnement santé pour les professionnels du secteur médical";
+          } else if (solLower.includes('commerce') || solLower.includes('distribution') || solLower.includes('retail')) {
+            sectorPitch = "nos solutions de distribution commerciale et approvisionnement en gros pour les points de vente";
+          }
+
           return {
             id: `et_${siren || idx}_${Date.now()}`,
             nom,
@@ -1251,70 +1277,14 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
                 source
               }
             ],
-            // Generate a tailored pitch based on the company's solutionType
-            let sectorPitch = `notre solution de ${solutionType || 'services B2B'}`;
-            const solLower = solutionType.toLowerCase();
-
-            if (solLower.includes('alimentaire') || solLower.includes('hcr') || solLower.includes('boisson') || solLower.includes('apéritif')) {
-              sectorPitch = "nos gammes de boissons artisanales, coffrets apéritifs et produits du terroir de qualité pour les professionnels, événements d'entreprise et cadeaux d'affaires";
-            } else if (solLower.includes('btp') || solLower.includes('travaux') || solLower.includes('construction')) {
-              sectorPitch = "nos prestations de travaux, rénovation de bâtiments et services techniques pour les chantiers professionnels";
-            } else if (solLower.includes('assurance') || solLower.includes('prévoyance') || solLower.includes('mutuelle')) {
-              sectorPitch = "nos solutions de couverture santé collective, prévoyance et garanties RC Pro sur-mesure pour protéger vos équipes et vos locaux";
-            } else if (solLower.includes('logiciel') || solLower.includes('saas') || solLower.includes('tech')) {
-              sectorPitch = `notre plateforme logicielle pour optimiser et automatiser vos flux de travail quotidiens`;
-            } else if (solLower.includes('marketing') || solLower.includes('communication') || solLower.includes('agence')) {
-              sectorPitch = "nos services d'accompagnement en visibilité digitale, branding de marque et campagnes d'acquisition de prospects";
-            } else if (solLower.includes('formation') || solLower.includes('compétence')) {
-              sectorPitch = "nos programmes de formation continue et ateliers certifiants pour développer les compétences de vos équipes";
-            } else if (solLower.includes('conseil') || solLower.includes('cabinet') || solLower.includes('audit')) {
-              sectorPitch = "nos services d'accompagnement stratégique, audit organisationnel et conseil en gestion pour sécuriser votre croissance";
-            } else if (solLower.includes('transport') || solLower.includes('logistique')) {
-              sectorPitch = "nos solutions d'acheminement, livraison express et gestion logistique pour optimiser vos flux de marchandises";
-            } else if (solLower.includes('santé') || solLower.includes('médical')) {
-              sectorPitch = "nos équipements spécialisés et solutions d'accompagnement santé pour les professionnels du secteur médical";
-            } else if (solLower.includes('commerce') || solLower.includes('distribution') || solLower.includes('retail')) {
-              sectorPitch = "nos solutions de distribution commerciale et approvisionnement en gros pour les points de vente";
+            planApproche: {
+              canalRecommande: canal,
+              angleAccroche: `Signal détecté : ${angleText}`,
+              messageDraft: idx === 0
+                ? `Bonjour ${firstName},\n\nJ'ai remarqué que ${nom} (${ville}) est actuellement en phase de ${angleText}.\n\nJe pense que ${sectorPitch} pourrait grandement intéresser vos équipes.\n\nSeriez-vous disponible pour un échange rapide de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
+                : `Bonjour ${firstName},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous proposons ${sectorPitch} pour accompagner les entreprises de votre secteur.\n\nUn échange rapide vous intéresse-t-il ?\n\nBien cordialement,\n[Votre prénom]`
             }
-
-            return {
-              id: `et_${siren || idx}_${Date.now()}`,
-              nom,
-              siren,
-              secteur: nafCode2,
-              secteurLabel: nafLabel,
-              effectif,
-              ville,
-              codePostal: cp,
-              fitScore,
-              fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: idx < 3 }),
-              timingScore,
-              timingDetail: JSON.stringify({ signalDetecte: signal }),
-              statutCRM: 'nouveau',
-              decideurs: [
-                {
-                  id: `dec_${idx}_${Date.now()}`,
-                  nom: `${firstName} ${lastName}`,
-                  fonction: role,
-                  linkedinUrl: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(role + ' ' + nom)}`,
-                  emailTrouve: `${firstName.charAt(0).toLowerCase()}.${lastName.toLowerCase()}@${emailDomain}`,
-                  emailStatutVerif: idx % 3 === 1 ? 'risque' : 'verifie',
-                  emailProbabiliteBounce: idx % 3 === 1 ? 0.14 : 0.03,
-                  telephoneTrouve: (idx % 2 === 0 ? '06' : '07') + Math.floor(10000000 + idx * 13579246 % 89999999),
-                  telephoneType: idx % 2 === 0 ? 'mobile' : 'direct',
-                  telephoneActif: idx < 4,
-                  confiance: Math.max(65, 93 - idx * 5),
-                  source
-                }
-              ],
-              planApproche: {
-                canalRecommande: canal,
-                angleAccroche: `Signal détecté : ${angleText}`,
-                messageDraft: idx === 0
-                  ? `Bonjour ${firstName},\n\nJ'ai remarqué que ${nom} (${ville}) est actuellement en phase de ${angleText}.\n\nJe pense que ${sectorPitch} pourrait grandement intéresser vos équipes.\n\nSeriez-vous disponible pour un échange rapide de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
-                  : `Bonjour ${firstName},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous proposons ${sectorPitch} pour accompagner les entreprises de votre secteur.\n\nUn échange rapide vous intéresse-t-il ?\n\nBien cordialement,\n[Votre prénom]`
-              }
-            };
+          };
           };
 
         // Use SIRENE results if available, otherwise fallback minimal set
