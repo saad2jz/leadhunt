@@ -1560,6 +1560,22 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
       return { success: true, veille };
     }
 
+    case 'campagnes': {
+      const campaigns = getItems(STORAGE_KEYS.CAMPAGNES);
+      if (method === 'POST') {
+        const newCampagne = {
+          id: 'camp_' + Date.now(),
+          nom: body.nom || 'Nouvelle Campagne',
+          description: body.description || '',
+          createdAt: new Date().toISOString()
+        };
+        campaigns.push(newCampagne);
+        setItems(STORAGE_KEYS.CAMPAGNES, campaigns);
+        return { success: true, campagne: newCampagne };
+      }
+      return { success: true, campagnes: campaigns };
+    }
+
     case 'leads': {
       const leads = getItems(STORAGE_KEYS.LEADS);
       return { success: true, leads };

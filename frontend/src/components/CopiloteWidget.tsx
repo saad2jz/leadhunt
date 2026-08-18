@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { geminiChat, GEMINI_SYSTEM_PROMPT } from '@/lib/gemini-client';
 
 // ---- Types ----
+// ---- Types ----
 interface ChatMessage {
   role: 'user' | 'assistant' | 'action_proposal';
   content?: string;
@@ -17,6 +18,12 @@ interface ChatMessage {
 interface ProposedAction {
   typeAction: string;
   parametres: Record<string, unknown>;
+}
+
+interface SuggestionItem {
+  label: string;
+  icon: string;
+  text: string;
 }
 
 // ---- Helpers ----
@@ -69,17 +76,18 @@ ${campagneSummary}
 - /settings : paramètres et intégrations
 
 ## Instructions de format
-Si tu proposes une action concrète, structure ta réponse EXACTEMENT ainsi (JSON valide) :
-{"response": "Ton texte de réponse", "proposedAction": {"typeAction": "nom_action", "parametres": {}}}
+Tu dois obligatoirement retourner un JSON valide avec le champ "suggestions" contenant 3 à 4 suggestions contextuelles pertinentes adaptées aux prochaines actions de l'utilisateur.
+Si tu proposes une action concrète, structure ta réponse EXACTEMENT ainsi :
+{"response": "Ton texte", "proposedAction": {"typeAction": "nom_action", "parametres": {}}, "suggestions": [{"label": "Action", "icon": "🔍", "text": "Texte complet"}]}
 
 Si tu réponds seulement (sans action), utilise :
-{"response": "Ton texte de réponse"}
+{"response": "Ton texte", "suggestions": [{"label": "Action", "icon": "📊", "text": "Texte complet"}]}
 
-IMPORTANT: Ne dépasse JAMAIS les 3 lignes dans ta réponse. Sois concis et actionable.`;
+IMPORTANT: Ne dépasse JAMAIS les 3 lignes dans ta réponse textuelle. Sois concis.`;
 }
 
 // ---- Suggestion bubbles ----
-const SUGGESTIONS = [
+const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
   { label: 'Recherche SIRENE', icon: '🔍', text: 'Lance une recherche SIRENE pour trouver des prospects' },
   { label: 'Prospects CRM', icon: '👥', text: 'Combien de prospects ai-je dans mon CRM ?' },
   { label: 'Carte des prospects', icon: '🗺️', text: 'Navigue vers la carte des prospects' },
@@ -97,11 +105,49 @@ export default function CopiloteWidget() {
   const [loading, setLoading] = useState(false);
   const [geminiError, setGeminiError] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>(DEFAULT_SUGGESTIONS);
 
   // Conversation history for multi-turn context (Gemini format)
   const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Update suggestions dynamically based on current page path
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePathnameChange = () => {
+      const path = window.location.pathname;
+      if (path === '/prospection') {
+        setSuggestions([
+          { label: 'Trouver des Restos', icon: '🍕', text: 'Lance une recherche SIRENE pour des restaurants à Paris' },
+          { label: 'Trouver des ESN/Devs', icon: '💻', text: 'Recherche des entreprises informatiques à Lyon' },
+          { label: 'Trouver du BTP', icon: '🏗️', text: 'Trouve des entreprises de construction à Marseille' },
+          { label: 'Retour au CRM', icon: '👥', text: 'Va sur la page des prospects' }
+        ]);
+      } else if (path === '/carte') {
+        setSuggestions([
+          { label: 'Fiche Prospect', icon: '👤', text: 'Combien ai-je de prospects sur la carte ?' },
+          { label: 'Optimiser Tournée', icon: '🚗', text: 'Comment optimiser ma tournée sur le terrain ?' },
+          { label: 'Nouveau Prospect', icon: '➕', text: 'Comment ajouter manuellement un prospect ?' }
+        ]);
+      } else if (path === '/campagnes') {
+        setSuggestions([
+          { label: 'Créer Campagne', icon: '📧', text: 'Aide-moi à configurer une campagne d outreach' },
+          { label: 'Lancer Relance', icon: '⚡', text: 'Comment programmer une relance automatique ?' },
+          { label: 'Statistiques', icon: '📊', text: 'Montre-moi les statistiques CRM' }
+        ]);
+      } else {
+        setSuggestions(DEFAULT_SUGGESTIONS);
+      }
+    };
+
+    handlePathnameChange();
+    
+    // Listen for custom SPA routing events or intervals to update suggestions
+    const interval = setInterval(handlePathnameChange, 1500);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -212,6 +258,7 @@ export default function CopiloteWidget() {
       // Try to parse as JSON (structured response)
       let assistantText = rawResponse;
       let proposedAction: ProposedAction | null = null;
+      let aiSuggestions: SuggestionItem[] = [];
 
       const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -223,6 +270,9 @@ export default function CopiloteWidget() {
           if (parsed.proposedAction) {
             proposedAction = parsed.proposedAction;
           }
+          if (Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) {
+            aiSuggestions = parsed.suggestions;
+          }
         } catch {
           // Not valid JSON, use raw text
           assistantText = rawResponse;
@@ -233,6 +283,11 @@ export default function CopiloteWidget() {
       historyRef.current.push({ role: 'assistant', content: assistantText });
 
       setMessages(prev => [...prev, { role: 'assistant', content: assistantText }]);
+
+      // Update suggestions if Gemini returned custom ones
+      if (aiSuggestions.length > 0) {
+        setSuggestions(aiSuggestions);
+      }
 
       if (proposedAction) {
         setMessages(prev => [
@@ -410,7 +465,7 @@ export default function CopiloteWidget() {
             {/* Suggestion Bubbles */}
             {!loading && showSuggestions && (
               <div className="flex flex-wrap gap-2 pt-2">
-                {SUGGESTIONS.map((s, i) => (
+                {suggestions.map((s, i) => (
                   <button
                     key={i}
                     id={`suggestion-${i}`}
