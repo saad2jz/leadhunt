@@ -4,6 +4,19 @@ import { authOptions } from '@/lib/auth-options';
 import { getScopedPrisma } from '@/lib/auth-scope';
 import { z } from 'zod';
 
+const createProspectSchema = z.object({
+  id: z.string().optional(),
+  nom: z.string(),
+  secteur: z.string().nullable().optional(),
+  ville: z.string().nullable().optional(),
+  adresse: z.string().nullable().optional(),
+  siteWeb: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  telephone: z.string().nullable().optional(),
+  score: z.number().optional(),
+  statut: z.string().optional(),
+});
+
 const updateProspectSchema = z.object({
   id: z.string(),
   statut: z.string().optional(),
@@ -40,18 +53,59 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const validatedData = updateProspectSchema.parse(body);
     const scopedPrisma = getScopedPrisma(session);
 
-    const updated = await scopedPrisma.prospect.update({
-      where: { id: validatedData.id },
-      data: {
-        statut: validatedData.statut,
-        nom: validatedData.nom,
-      },
-    });
+    if (body.id) {
+      // Modification
+      const validatedData = updateProspectSchema.parse(body);
+      const updated = await scopedPrisma.prospect.update({
+        where: { id: validatedData.id },
+        data: {
+          statut: validatedData.statut,
+          nom: validatedData.nom,
+        },
+      });
+      return NextResponse.json({ success: true, prospect: updated });
+    } else {
+      // Création
+      const validatedData = createProspectSchema.parse(body);
 
-    return NextResponse.json({ success: true, prospect: updated });
+      // Géocodage de l'adresse de manière asynchrone
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      const fullAddress = [validatedData.adresse, validatedData.ville].filter(Boolean).join(', ');
+      if (fullAddress) {
+        try {
+          const { geocodeAddress } = require('@/lib/geocoding');
+          const geo = await geocodeAddress(fullAddress);
+          if (geo) {
+            latitude = geo.latitude;
+            longitude = geo.longitude;
+          }
+        } catch (e) {
+          console.error('Erreur géocodage création prospect manuelle:', e);
+        }
+      }
+
+      const created = await scopedPrisma.prospect.create({
+        data: {
+          organisationId: session.user.organisationId,
+          nom: validatedData.nom,
+          secteur: validatedData.secteur || null,
+          ville: validatedData.ville || null,
+          adresse: validatedData.adresse || null,
+          siteWeb: validatedData.siteWeb || null,
+          email: validatedData.email || null,
+          telephone: validatedData.telephone || null,
+          score: validatedData.score || 70,
+          statut: validatedData.statut || 'À appeler',
+          latitude,
+          longitude,
+        },
+      });
+
+      return NextResponse.json({ success: true, prospect: created });
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0]?.message || error.message }, { status: 400 });
