@@ -343,7 +343,7 @@ export function initMockApi() {
       console.log(`[Mock API Interceptor] Intercepted Request: ${url}`, init);
 
       try {
-        const responseData = handleMockRoute(url, init);
+        const responseData = await handleMockRoute(url, init);
         return new Response(JSON.stringify(responseData), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -363,7 +363,7 @@ export function initMockApi() {
 }
 
 // Intercept specific routes
-function handleMockRoute(url: string, init?: RequestInit): any {
+async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
   // Normalize path and remove any trailing slash
   let path = url.split('?')[0].split('/api/')[1];
   if (path.endsWith('/')) {
@@ -1023,308 +1023,173 @@ function handleMockRoute(url: string, init?: RequestInit): any {
       // Simulate a background worker: if 3 seconds have passed since creation, mark as finished!
       if (search.statut === 'en_cours' && Date.now() - search.createdAt > 3000) {
         search.statut = 'terminee';
-        
-        // Populate mock results data
-        search.buyerPersonas = [
-          {
-            id: 'bp_' + Date.now(),
-            roleTarget: search.besoin?.rolesDecideurs?.[0] || 'CTO',
-            motivations: JSON.stringify([
-              'Gagner du temps sur la prospection froide.',
-              'Automatiser les séquences email de relance.'
-            ]),
-            objections: JSON.stringify([
-              'Crainte du bounce ou d\'atterrir en spam.',
-              'Complexité de configuration technique.'
-            ]),
-            vocabulaire: JSON.stringify(['Relance', 'Ciblage', 'Waterfall', 'Cold Email']),
-            kpis: JSON.stringify(['Taux d\'ouverture', 'Réponses', 'RDV pris'])
-          }
-        ];
 
-        // Dynamic sector-aware results generator
-        const solutionType: string = search.besoin?.solutionType || '';
-        const secteurs: string[] = search.besoin?.secteurs || [];
         const roles: string[] = search.besoin?.rolesDecideurs || ['Gérant', 'Directeur commercial'];
-        const zones: string[] = search.besoin?.zonesGeo || ['Paris'];
+        const secteurs: string[] = search.besoin?.secteurs || [];
         const signaux: string[] = search.besoin?.signauxAchat || ['recrutement'];
+        const solutionType: string = search.besoin?.solutionType || '';
         const entryVal: string = search.entryValue || '';
 
-        // Sector catalog — each entry contains: company names, city pairs, decision-maker first names, angles
-        const sectorCatalog: Record<string, {
-          companies: [string, string, string][]; // [nom, secteur, effectif]
-          villes: string[];
-          prenoms: string[];
-          angles: string[];
-          mots: string[];
-        }> = {
-          food: {
-            companies: [
-              ['Brasserie du Vieux Lyon', '56.10A', '12 salariés'],
-              ['Traiteur Saveurs & Co', '56.21Z', '8 salariés'],
-              ['Épicerie Fine Terroir Plus', '47.25Z', '5 salariés'],
-              ['Restaurant Le Comptoir des Chefs', '56.10C', '18 salariés'],
-              ['Catering Pro Solutions', '56.29A', '32 salariés'],
-            ],
-            villes: ['Lyon', 'Paris 15e', 'Bordeaux', 'Toulouse', 'Marseille'],
-            prenoms: ['Julien Morel', 'Isabelle Ferrand', 'Thomas Beauvais', 'Clara Dumas', 'Patrick Renaud'],
-            angles: ['recrutement de cuisiniers', 'lancement d\'une carte saison', 'ouverture d\'un nouveau établissement', 'partenariat traiteur entreprises', 'développement livraison B2B'],
-            mots: ['restaurateurs', 'traiteurs', 'chefs', 'établissements HCR'],
-          },
-          btp: {
-            companies: [
-              ['Groupe Maçonnerie Sud', '41.10A', '28 salariés'],
-              ['Rénovation Habitat Concept', '43.21A', '15 salariés'],
-              ['BTP Île-de-France Pro', '42.11Z', '55 salariés'],
-              ['Charpente & Toiture Dupont', '43.91A', '10 salariés'],
-              ['Isolation Thermique Expert', '43.29A', '22 salariés'],
-            ],
-            villes: ['Nantes', 'Lille', 'Paris', 'Lyon', 'Strasbourg'],
-            prenoms: ['Pierre Gauthier', 'Arnaud Leroy', 'Sophie Bernard', 'Claude Martin', 'Frédéric Allard'],
-            angles: ['chantier de rénovation énergétique', 'appel d\'offres promoteur', 'recrutement ouvriers qualifiés', 'projet collectivité locale', 'mise aux normes RE2020'],
-            mots: ['promoteurs', 'maîtres d\'ouvrage', 'syndics', 'collectivités'],
-          },
-          assurance: {
-            companies: [
-              ['Cabinet Dupuis Prévoyance', '66.22Z', '9 salariés'],
-              ['Assurance Pro Conseil', '66.19A', '14 salariés'],
-              ['Gestion Patrimoine Lefevre', '66.30Z', '7 salariés'],
-              ['Courtier Santé Entreprise', '66.22Z', '20 salariés'],
-              ['Mutuelle Pro Services', '65.12Z', '38 salariés'],
-            ],
-            villes: ['Paris 8e', 'Lyon', 'Bordeaux', 'Rennes', 'Nantes'],
-            prenoms: ['Laure Mercier', 'David Simon', 'Nathalie Vidal', 'Bruno Chapuis', 'Aurore Fabre'],
-            angles: ['portefeuille RC Pro en expansion', 'recrutement conseiller prévoyance', 'refonte offre mutuelle TNS', 'digitalisation souscription contrats', 'nouveaux produits employeurs PME'],
-            mots: ['courtiers', 'agents généraux', 'gestionnaires de patrimoine', 'mutuelles'],
-          },
-          industrie: {
-            companies: [
-              ['Métallurgie Rhône Industrie', '25.62Z', '120 salariés'],
-              ['Plastics Packaging Solutions', '22.22Z', '85 salariés'],
-              ['Forge & Fonderie Michaud', '25.50Z', '200 salariés'],
-              ['Machines-Outils Precision', '28.41Z', '65 salariés'],
-              ['Emballage Technique Pro', '17.21Z', '48 salariés'],
-            ],
-            villes: ['Mulhouse', 'Valenciennes', 'Saint-Étienne', 'Grenoble', 'Rouen'],
-            prenoms: ['Gilles Masson', 'Véronique Poirier', 'Alain Rousseau', 'Christine Petit', 'Stéphane Garnier'],
-            angles: ['montée en cadence production', 'recrutement techniciens qualifiés', 'nouveau contrat sous-traitance', 'mise aux normes ISO 9001', 'investissement ligne de production'],
-            mots: ['sous-traitants', 'équipementiers', 'fabricants', 'donneurs d\'ordre'],
-          },
-          sante: {
-            companies: [
-              ['Clinique Saint-Louis Médical', '86.10Z', '45 salariés'],
-              ['Cabinet Médical Groupe Santé+', '86.21Z', '12 salariés'],
-              ['Pharmacie Centrale Beaulieu', '47.73Z', '8 salariés'],
-              ['Centre Rééducation Kiné Pro', '86.90A', '18 salariés'],
-              ['EHPAD Les Jardins Sereins', '87.10A', '65 salariés'],
-            ],
-            villes: ['Paris', 'Toulouse', 'Nice', 'Montpellier', 'Rennes'],
-            prenoms: ['Dr. Aurélien Faure', 'Sophie Guillot', 'Marc-Antoine Lebrun', 'Hélène Perrot', 'Christophe Bonnet'],
-            angles: ['ouverture nouveau cabinet de groupe', 'recrutement aide-soignants', 'digitalisation dossier médical', 'accréditation HAS', 'extension locaux médicaux'],
-            mots: ['cliniques', 'cabinets médicaux', 'EHPAD', 'pharmacies'],
-          },
-          commerce: {
-            companies: [
-              ['Boutique Mode & Tendances', '47.71Z', '6 salariés'],
-              ['Concept Store Urban Life', '47.59B', '9 salariés'],
-              ['Franchise Beauté Premium', '47.75Z', '14 salariés'],
-              ['Showroom Mobilier Design', '47.59A', '8 salariés'],
-              ['Distributeur Multimarques Pro', '46.42Z', '22 salariés'],
-            ],
-            villes: ['Paris Marais', 'Bordeaux', 'Nantes', 'Lille', 'Strasbourg'],
-            prenoms: ['Camille Bertrand', 'Hugo Remy', 'Mathilde Collin', 'Alexandre Blanc', 'Julie Fontaine'],
-            angles: ['ouverture nouvelle boutique', 'recrutement vendeurs conseils', 'refonte collection printemps', 'développement vente en ligne', 'partenariat marque exclusive'],
-            mots: ['boutiques', 'franchisés', 'concept stores', 'distributeurs'],
-          },
-          transport: {
-            companies: [
-              ['Transport Express Nord', '49.41A', '38 salariés'],
-              ['Logistique & Distribution Pro', '52.10B', '75 salariés'],
-              ['Coursiers Derniers Kilomètre', '53.20Z', '22 salariés'],
-              ['Fret International Dupont', '52.29B', '55 salariés'],
-              ['Entrepôt Logistique Centre', '52.10A', '130 salariés'],
-            ],
-            villes: ['Roissy', 'Lyon', 'Marseille', 'Bordeaux', 'Lille'],
-            prenoms: ['Pascal Moulin', 'Sébastien Cordier', 'Émilie Vacher', 'Nicolas Arnaud', 'Damien Moreau'],
-            angles: ['augmentation volumes e-commerce', 'recrutement chauffeurs SPL', 'extension zone de livraison', 'investissement flotte électrique', 'nouveau contrat plateforme marketplace'],
-            mots: ['transporteurs', 'logisticiens', 'e-commerçants', 'importateurs'],
-          },
-          marketing: {
-            companies: [
-              ['Agence Créative Impact', '73.11Z', '15 salariés'],
-              ['Digital Studio & SEO Pro', '73.12Z', '8 salariés'],
-              ['Communication Groupe Leroy', '70.21Z', '25 salariés'],
-              ['Influence & Social Media Co', '73.11Z', '12 salariés'],
-              ['Événementiel Pro Events', '82.30Z', '18 salariés'],
-            ],
-            villes: ['Paris', 'Lyon', 'Bordeaux', 'Montpellier', 'Nantes'],
-            prenoms: ['Lucie Girard', 'Antoine Marchetti', 'Émilie Renard', 'Raphaël Bonnet', 'Marie Tessier'],
-            angles: ['levée de fonds série A', 'refonte identité visuelle', 'lancement campagne acquisition', 'recrutement équipe créa', 'nouveau site e-commerce'],
-            mots: ['agences', 'startups marketing', 'ETI rebranding', 'scale-ups'],
-          },
-          formation: {
-            companies: [
-              ['Organisme Formation Pro Conseil', '85.59B', '22 salariés'],
-              ['École Management & Leadership', '85.32Z', '18 salariés'],
-              ['CPF Formation Continue Plus', '85.59A', '12 salariés'],
-              ['Centre Bilan Compétences', '85.60Z', '8 salariés'],
-              ['Formation Industrie Technique', '85.59B', '30 salariés'],
-            ],
-            villes: ['Paris', 'Lyon', 'Toulouse', 'Marseille', 'Nantes'],
-            prenoms: ['Hélène Dupont', 'François Morin', 'Valérie Simon', 'Laurent Dubois', 'Marie-Claire Aubert'],
-            angles: ['recrutement formateurs experts', 'nouveau plan formation DRH', 'certification Qualiopi renouvelée', 'digitalisation e-learning', 'partenariat OPCO financement'],
-            mots: ['DRH', 'responsables formation', 'organismes Qualiopi', 'OPCO'],
-          },
-          conseil: {
-            companies: [
-              ['Cabinet Stratégie & Finance', '70.22Z', '32 salariés'],
-              ['Expertise Comptable Associés', '69.20Z', '18 salariés'],
-              ['Avocat Droit des Affaires', '69.10Z', '8 salariés'],
-              ['Conseil RH & Organisation', '70.22Z', '15 salariés'],
-              ['Management de Transition PME', '78.10Z', '25 salariés'],
-            ],
-            villes: ['Paris 17e', 'Lyon Part-Dieu', 'Bordeaux', 'Lille', 'Nantes'],
-            prenoms: ['Éric Beaumont', 'Nathalie Lecomte', 'Bertrand Fournier', 'Isabelle Chambon', 'Grégoire Perrin'],
-            angles: ['projet de transformation ERP', 'levée de fonds Série B', 'restructuration dette LBO', 'recrutement associé spécialisé', 'acquisition cible stratégique'],
-            mots: ['dirigeants PME', 'DAF ETI', 'fonds investissement', 'directions générales'],
-          },
-          logiciel: {
-            companies: [
-              ['SaaS Data Analytics Pro', '62.01Z', '48 salariés'],
-              ['CyberSec Solutions France', '62.09Z', '35 salariés'],
-              ['ERP Cloud PME Expert', '62.01Z', '60 salariés'],
-              ['IA Automation Startup', '72.19Z', '28 salariés'],
-              ['Marketplace B2B Connect', '63.11Z', '40 salariés'],
-            ],
-            villes: ['Paris 9e', 'Lyon', 'Bordeaux', 'Nantes', 'Grenoble'],
-            prenoms: ['Alexis Jourdain', 'Céline Brunet', 'Maxime Leconte', 'Laura Guérin', 'Pierre Aumont'],
-            angles: ['levée de fonds seed', 'recrutement équipe produit', 'migration infrastructure cloud', 'lancement nouvelle version SaaS', 'expansion commerciale Europe'],
-            mots: ['DSI', 'CTO', 'startups SaaS', 'ETI digitalisation'],
-          },
-          generique: {
-            companies: [
-              ['Groupe PME Solutions', '70.22Z', '25 salariés'],
-              ['Entreprise Pro Connect', '46.90Z', '18 salariés'],
-              ['Services B2B Régional', '74.90B', '12 salariés'],
-              ['Alliance Commerce Pro', '70.22Z', '30 salariés'],
-              ['Partenaires Affaires France', '46.11Z', '20 salariés'],
-            ],
-            villes: ['Paris', 'Lyon', 'Bordeaux', 'Toulouse', 'Nantes'],
-            prenoms: ['Jean Martin', 'Sophie Leclerc', 'Luc Renault', 'Marie Dubois', 'Paul Fontaine'],
-            angles: ['développement commercial', 'recrutement équipe ventes', 'nouveau marché cible', 'partenariat stratégique', 'croissance chiffre d\'affaires'],
-            mots: ['décideurs B2B', 'PME régionales', 'dirigeants', 'directeurs commerciaux'],
-          },
-        };
+        // --- Call real SIRENE open-data API ---
+        // Map NAF code(s) and search keywords to the query
+        const nafCode = secteurs.find(s => s.includes('.')) || '';
+        const q = entryVal
+          ? entryVal.split(',')[0].trim()   // first keyword the user typed
+          : solutionType.split(' ')[0];     // or first word of solution type
 
-        // Determine which sector catalog to use
-        const sol = solutionType.toLowerCase();
-        let catalog = sectorCatalog.generique;
-        if (sol.includes('alimentaire') || sol.includes('hcr') || sol.includes('restaur') || sol.includes('boisson')) catalog = sectorCatalog.food;
-        else if (sol.includes('btp') || sol.includes('travaux') || sol.includes('construction')) catalog = sectorCatalog.btp;
-        else if (sol.includes('assurance') || sol.includes('prévoyance') || sol.includes('mutuelle')) catalog = sectorCatalog.assurance;
-        else if (sol.includes('industriel') || sol.includes('manufacture') || sol.includes('équipement')) catalog = sectorCatalog.industrie;
-        else if (sol.includes('santé') || sol.includes('médical') || sol.includes('médic')) catalog = sectorCatalog.sante;
-        else if (sol.includes('commerce') || sol.includes('retail') || sol.includes('distribution')) catalog = sectorCatalog.commerce;
-        else if (sol.includes('transport') || sol.includes('logistique')) catalog = sectorCatalog.transport;
-        else if (sol.includes('marketing') || sol.includes('communication') || sol.includes('agence')) catalog = sectorCatalog.marketing;
-        else if (sol.includes('formation') || sol.includes('compétences') || sol.includes('apprentissage')) catalog = sectorCatalog.formation;
-        else if (sol.includes('conseil') || sol.includes('expertise') || sol.includes('cabinet')) catalog = sectorCatalog.conseil;
-        else if (sol.includes('logiciel') || sol.includes('saas') || sol.includes('tech')) catalog = sectorCatalog.logiciel;
+        let sirenResults: any[] = [];
+        try {
+          // Build query to recherche-entreprises.api.gouv.fr (free, no auth, CORS-enabled)
+          const params = new URLSearchParams();
+          if (q && q.length > 2) params.set('q', q);
+          if (nafCode) params.set('activite_principale', nafCode);
+          params.set('page', '1');
+          params.set('per_page', '8');
+          params.set('etat_administratif', 'A'); // only active companies
 
-        // Also check entry value keywords
-        if (catalog === sectorCatalog.generique && entryVal) {
-          const ev = entryVal.toLowerCase();
-          if (/restau|traiteur|brasserie|cafet|hcr/i.test(ev)) catalog = sectorCatalog.food;
-          else if (/btp|construction|charpente|plomberie/i.test(ev)) catalog = sectorCatalog.btp;
-          else if (/assurance|mutuelle|prevoyance/i.test(ev)) catalog = sectorCatalog.assurance;
-          else if (/industrie|usine|fabricant|metallurgie/i.test(ev)) catalog = sectorCatalog.industrie;
-          else if (/clinique|cabinet médical|ehpad|pharmacie/i.test(ev)) catalog = sectorCatalog.sante;
-          else if (/boutique|commerce|franchise|retail/i.test(ev)) catalog = sectorCatalog.commerce;
-          else if (/transport|logistique|livraison/i.test(ev)) catalog = sectorCatalog.transport;
-          else if (/agence|marketing|communication/i.test(ev)) catalog = sectorCatalog.marketing;
-          else if (/formation|drh|cpf/i.test(ev)) catalog = sectorCatalog.formation;
-          else if (/conseil|cabinet|audit|comptable/i.test(ev)) catalog = sectorCatalog.conseil;
-          else if (/saas|logiciel|tech|digital/i.test(ev)) catalog = sectorCatalog.logiciel;
+          const apiUrl = `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
+          console.log('[Mock API] Calling SIRENE API:', apiUrl);
+
+          const sirenRes = await fetch(apiUrl);
+          if (sirenRes.ok) {
+            const sirenData = await sirenRes.json();
+            sirenResults = sirenData.results || [];
+            console.log(`[Mock API] SIRENE returned ${sirenResults.length} results`);
+          }
+        } catch (sirenErr) {
+          console.warn('[Mock API] SIRENE API call failed, falling back to catalog:', sirenErr);
         }
 
+        // Enrichment data generators (email/phone/LinkedIn remain simulated)
+        const FIRST_NAMES = ['Alexandre', 'Sophie', 'Thomas', 'Marie', 'Nicolas', 'Isabelle', 'Julien', 'Claire'];
+        const LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Moreau', 'Laurent', 'Lefebvre', 'Girard', 'Roux'];
+        const SOURCES = ['Waterfall cascade (LinkedIn + Hunter)', 'Hunter.io + Dropcontact', 'Apollo.io enrichissement', 'PhantomBuster + Kaspr', 'LinkedIn Sales Navigator'];
+        const ANGLES = {
+          recrutement: 'recrutement actif de vos équipes',
+          levees_fonds: 'levée de fonds récente',
+          refonte_site: 'refonte de votre site web',
+          technologie_modifiee: 'changement technologique récent',
+        };
 
-        search.buyerPersonas = [
-          {
-            id: 'bp_' + Date.now(),
-            roleTarget: roles[0] || 'Gérant',
-            motivations: JSON.stringify([
-              `Développer rapidement un portefeuille de ${catalog.mots[0]} qualifiés.`,
-              `Réduire le temps de prospection manuelle et automatiser les relances.`,
-              `Identifier les bons décideurs au bon moment grâce aux signaux d'achat.`
-            ]),
-            objections: JSON.stringify([
-              `Doute sur la qualité des données pour le secteur ${catalog.mots[0]}.`,
-              `Préférence pour les recommandations réseau plutôt que la prospection froide.`
-            ]),
-            vocabulaire: JSON.stringify(['Pipeline', catalog.mots[0], 'Relance', 'Ciblage', (signaux[0] || 'recrutement') === 'recrutement' ? 'Signal recrutement' : 'Levée de fonds']),
-            kpis: JSON.stringify(['Taux de réponse', 'RDV qualifiés', 'Cycle de vente', 'Taux de transformation'])
-          }
-        ];
+        const buildFromSirene = (etablissement: any, idx: number): any => {
+          const nom = etablissement.nom_complet || etablissement.nom_raison_sociale || `Entreprise ${idx + 1}`;
+          const siren = etablissement.siren || '';
+          const nafLabel = etablissement.activite_principale_libelle || solutionType;
+          const nafCode2 = etablissement.activite_principale || secteurs[0] || '70.22Z';
+          const villeRaw = etablissement.siege?.libelle_commune || etablissement.siege?.code_postal || 'France';
+          const ville = villeRaw.charAt(0).toUpperCase() + villeRaw.slice(1).toLowerCase();
+          const cp = etablissement.siege?.code_postal || '';
 
-        // Helper to build one company entry from catalog index
-        const buildCompany = (idx: number) => {
-          const c = catalog.companies[idx % catalog.companies.length];
-          const p = catalog.prenoms[idx % catalog.prenoms.length];
-          const angle = catalog.angles[idx % catalog.angles.length];
-          const vil = zones[idx % zones.length] || catalog.villes[idx % catalog.villes.length];
-          const sig = signaux[idx % signaux.length] || 'recrutement';
+          // Effectif
+          let effectif = '';
+          const tranche = etablissement.tranche_effectif_salarie;
+          const effectifMap: Record<string, string> = {
+            '00': '0 salarié', '01': '1-2 salariés', '02': '3-5 salariés',
+            '03': '6-9 salariés', '11': '10-19 salariés', '12': '20-49 salariés',
+            '21': '50-99 salariés', '22': '100-199 salariés', '31': '200-499 salariés',
+            '32': '500-999 salariés', '41': '1000-1999 salariés', '42': '2000+ salariés',
+          };
+          effectif = tranche ? (effectifMap[tranche] || `Effectif ${tranche}`) : 'NC';
+
+          const firstName = FIRST_NAMES[idx % FIRST_NAMES.length];
+          const lastName = LAST_NAMES[idx % LAST_NAMES.length];
           const role = roles[idx % roles.length] || 'Gérant';
-          const firstName = p.split(' ')[0];
-          const lastName = p.split(' ').slice(1).join(' ') || '';
-          const emailDom = c[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) + (idx % 2 === 0 ? '.fr' : '.com');
-          const emailVerif = idx % 3 === 1 ? 'risque' : 'verifie';
-          const bounce = idx % 3 === 1 ? 0.12 : 0.03;
-          const confiance = 95 - idx * 4;
-          const fitScore = 95 - idx * 2 + (idx % 2);
-          const timingScore = 92 - idx * 3 + (idx % 2);
-          const telPrefix = idx % 2 === 0 ? '06' : '07';
-          const telSuffix = Math.floor(10000000 + (idx * 12345678) % 89999999);
-          const canal = sig === 'levees_fonds' ? 'linkedin' : (idx % 2 === 0 ? 'email' : 'linkedin');
-          const source = ['Waterfall cascade (LinkedIn + Hunter)', 'Hunter.io + Cascade Kaspr', 'Dropcontact + LinkedIn Sales Nav', 'PhantomBuster + Enrich', 'Apollo.io enrichissement'][idx % 5];
+          const signal = signaux[idx % signaux.length] || 'recrutement';
+          const angleText = ANGLES[signal as keyof typeof ANGLES] || signal;
+          const source = SOURCES[idx % SOURCES.length];
+          const emailDomain = nom.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) + (cp ? `.fr` : '.com');
+          const fitScore = Math.max(75, 95 - idx * 3);
+          const timingScore = Math.max(70, 92 - idx * 4);
+          const canal = signal === 'levees_fonds' ? 'linkedin' : (idx % 2 === 0 ? 'email' : 'linkedin');
 
           return {
-            id: `et${idx + 1}`,
-            nom: c[0],
-            secteur: c[1],
-            effectif: c[2],
-            ville: vil,
+            id: `et_${siren || idx}_${Date.now()}`,
+            nom,
+            siren,
+            secteur: nafCode2,
+            secteurLabel: nafLabel,
+            effectif,
+            ville,
+            codePostal: cp,
             fitScore,
-            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: idx < 2 }),
+            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: idx < 3 }),
             timingScore,
-            timingDetail: JSON.stringify({ signalDetecte: sig }),
+            timingDetail: JSON.stringify({ signalDetecte: signal }),
             statutCRM: 'nouveau',
             decideurs: [
               {
-                id: `dec${idx + 1}`,
-                nom: p,
+                id: `dec_${idx}_${Date.now()}`,
+                nom: `${firstName} ${lastName}`,
                 fonction: role,
-                linkedinUrl: `https://www.linkedin.com/in/${firstName.toLowerCase()}-${lastName.toLowerCase().replace(/\s/g, '-')}-lh`,
-                emailTrouve: `${firstName.charAt(0).toLowerCase()}.${lastName.toLowerCase().replace(/\s/g, '')}@${emailDom}`,
-                emailStatutVerif: emailVerif,
-                emailProbabiliteBounce: bounce,
-                telephoneTrouve: telPrefix + telSuffix,
+                linkedinUrl: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(role + ' ' + nom)}`,
+                emailTrouve: `${firstName.charAt(0).toLowerCase()}.${lastName.toLowerCase()}@${emailDomain}`,
+                emailStatutVerif: idx % 3 === 1 ? 'risque' : 'verifie',
+                emailProbabiliteBounce: idx % 3 === 1 ? 0.14 : 0.03,
+                telephoneTrouve: (idx % 2 === 0 ? '06' : '07') + Math.floor(10000000 + idx * 13579246 % 89999999),
                 telephoneType: idx % 2 === 0 ? 'mobile' : 'direct',
-                telephoneActif: idx !== 4,
-                confiance,
+                telephoneActif: idx < 4,
+                confiance: Math.max(65, 93 - idx * 5),
                 source
               }
             ],
             planApproche: {
               canalRecommande: canal,
-              angleAccroche: `Signal détecté : ${angle}`,
+              angleAccroche: `Signal détecté : ${angleText}`,
               messageDraft: idx === 0
-                ? `Bonjour ${firstName},\n\nJ'ai remarqué que ${c[0]} est actuellement en phase de ${angle}.\n\nNous accompagnons des ${catalog.mots[0]} comme vous à accélérer leur développement commercial B2B — sans effort manuel.\n\nSeriez-vous disponible pour un échange de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
-                : `Bonjour ${firstName},\n\nSuite à votre récent ${angle} chez ${c[0]}, je souhaitais vous contacter directement.\n\nNous aidons les ${catalog.mots[idx % catalog.mots.length] || catalog.mots[0]} à cibler et convertir leurs prospects B2B avec un minimum d'effort.\n\nUn échange rapide vous intéresse ?\n\nBien cordialement,\n[Votre prénom]`
+                ? `Bonjour ${firstName},\n\nJ'ai remarqué que ${nom} (${ville}) est actuellement en phase de ${angleText}.\n\nNous accompagnons des entreprises du secteur ${nafLabel} à développer leur pipeline commercial B2B de manière ciblée et automatisée.\n\nSeriez-vous disponible pour un échange de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
+                : `Bonjour ${firstName},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous aidons les décideurs comme vous à identifier et convertir les bons prospects B2B, sans prospection manuelle chronophage.\n\nUn échange rapide vous intéresse ?\n\nBien cordialement,\n[Votre prénom]`
             }
           };
         };
 
-        search.entreprises = Array.from({ length: catalog.companies.length }, (_, i) => buildCompany(i));
+        // Use SIRENE results if available, otherwise fallback minimal set
+        if (sirenResults.length > 0) {
+          search.entreprises = sirenResults.slice(0, 8).map((r: any, i: number) => buildFromSirene(r, i));
+        } else {
+          // Minimal fallback: generic but at least contextual
+          const fallbackNames = solutionType
+            ? [`${q || 'PME'} Services`, `Groupe ${q || 'Pro'} France`, `${q || 'Alliance'} & Associés`]
+            : ['Services Pro France', 'Groupe Alliance B2B', 'Partenaires Experts'];
+          search.entreprises = fallbackNames.map((nom, i) => buildFromSirene({
+            nom_complet: nom,
+            siren: '',
+            activite_principale: secteurs[0] || '70.22Z',
+            activite_principale_libelle: solutionType,
+            tranche_effectif_salarie: '12',
+            siege: { libelle_commune: ['Paris', 'Lyon', 'Bordeaux'][i] || 'France', code_postal: ['75001', '69001', '33000'][i] || '' }
+          }, i));
+        }
+
+        // Buyer persona (always generated from ICP context)
+        search.buyerPersonas = [
+          {
+            id: 'bp_' + Date.now(),
+            roleTarget: roles[0] || 'Gérant',
+            motivations: JSON.stringify([
+              `Trouver rapidement des prospects qualifiés dans le secteur ${solutionType || 'cible'}.`,
+              `Réduire le temps de prospection manuelle et automatiser les relances.`,
+              `Identifier les bons décideurs au bon moment grâce aux signaux d'achat.`
+            ]),
+            objections: JSON.stringify([
+              `Incertitude sur la qualité des données de contact.`,
+              `Préférence pour les recommandations réseau plutôt que la prospection froide.`
+            ]),
+            vocabulaire: JSON.stringify(['Pipeline', 'Relance', 'Ciblage', 'Signal d\'achat', signaux[0] === 'recrutement' ? 'Signal recrutement' : 'Levée de fonds']),
+            kpis: JSON.stringify(['Taux de réponse', 'RDV qualifiés', 'Cycle de vente', 'Taux de transformation'])
+          }
+        ];
+
+        // Update the item in the list
+        const idx = searches.findIndex(s => s.id === id);
+        if (idx > -1) {
+          searches[idx] = search;
+          setItems(STORAGE_KEYS.PROSPECTION, searches);
+        }
+      }
+
+      return { success: true, recherche: search };
+
+    }
 
         // Update the item in the list
         const idx = searches.findIndex(s => s.id === id);
