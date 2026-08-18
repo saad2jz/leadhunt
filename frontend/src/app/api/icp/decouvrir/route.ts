@@ -67,6 +67,25 @@ export async function POST(req: Request) {
         rolesDecideurs: ['DAF', 'Dirigeant', 'Responsable RH'],
         maxEntitesIA: 5,
       };
+    } else if (companyKey.includes('leadhunt') || companyKey.includes('saad2jz')) {
+      resumeActivite = "Logiciel B2B SaaS d'intelligence commerciale, enrichissement de données décideurs en cascade, détection de signaux d'achats et séquences froides automatisées.";
+      concurrentsIdentifies = ['kaspr.io', 'lemlist.com', 'lusha.com'];
+      segmentsProposes = [
+        { nom: 'Entreprises de Services du Numérique (ESN)', score: 94 },
+        { nom: 'Cabinets de Conseil B2B', score: 88 },
+        { nom: 'Startups Tech (SaaS)', score: 85 }
+      ];
+      besoinGenere = {
+        solutionType: 'Prospection B2B & Lead Gen',
+        tailleMin: 5,
+        tailleMax: 100,
+        zonesGeo: ['Toute la France', 'Belgique', 'Suisse'],
+        secteurs: ['62.01Z', '70.22Z', '73.11Z'], // ESN, Conseil, Com
+        budgetType: 'Standard',
+        signauxAchat: ['recrutement', 'levees_fonds'],
+        rolesDecideurs: ['Directeur Commercial', 'VP Sales', 'CEO', 'Gérant'],
+        maxEntitesIA: 5,
+      };
     } else {
       // ICP générique par défaut basé sur le nom
       resumeActivite = `Solution technologique innovante développée par ${companyKey.toUpperCase()} pour optimiser les processus métiers B2B et accélérer la transformation digitale des entreprises de services.`;
