@@ -41,6 +41,23 @@ export default function ProspectionSearchPage() {
 
   useEffect(() => {
     fetchPoids();
+
+    const handleCopiloteFill = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.page === '/prospection') {
+        const { siteUrl, entryValue } = customEvent.detail.data;
+        if (siteUrl) setSiteUrl(siteUrl);
+        if (entryValue) {
+          setEntryType('motscles');
+          setEntryValue(entryValue);
+        }
+      }
+    };
+
+    window.addEventListener('copilote-fill-form', handleCopiloteFill);
+    return () => {
+      window.removeEventListener('copilote-fill-form', handleCopiloteFill);
+    };
   }, []);
 
   const fetchPoids = async () => {

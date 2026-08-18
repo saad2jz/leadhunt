@@ -96,6 +96,29 @@ export default function ProspectsPage() {
   useEffect(() => {
     fetchProspects();
     fetchSavedViews();
+
+    const handleCopiloteFill = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.page === '/prospects') {
+        const d = customEvent.detail.data;
+        if (d.nom) setProspectNom(d.nom);
+        if (d.secteur) setProspectSecteur(d.secteur);
+        if (d.ville) setProspectVille(d.ville);
+        if (d.adresse) setProspectAdresse(d.adresse);
+        if (d.siteWeb) setProspectSiteWeb(d.siteWeb);
+        if (d.email) setProspectEmail(d.email);
+        if (d.telephone) setProspectPhone(d.telephone);
+        if (d.score) setProspectScore(d.score);
+        
+        // Ouvrir la modale d'ajout
+        setShowAddProspectModal(true);
+      }
+    };
+
+    window.addEventListener('copilote-fill-form', handleCopiloteFill);
+    return () => {
+      window.removeEventListener('copilote-fill-form', handleCopiloteFill);
+    };
   }, []);
 
   const fetchProspects = async () => {

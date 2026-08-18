@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, Send, Bot, User, Check, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function CopiloteWidget() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([
     { role: 'assistant', content: "Bonjour ! Je suis votre copilote commercial IA. Je peux lancer des recherches SIRENE, inscrire des prospects à des campagnes, ou vérifier vos statistiques. Que puis-je faire pour vous ?" }
@@ -24,13 +26,105 @@ export default function CopiloteWidget() {
 
   const SUGGESTIONS = [
     { label: 'Recherche SIRENE', icon: '🔍', text: 'Lancer une recherche SIRENE' },
-    { label: 'Inscrire à une séquence', icon: '📋', text: 'Inscrire mes prospects à une séquence' },
-    { label: 'Consulter mes statistiques', icon: '📊', text: 'Voir mes statistiques CRM' },
-    { label: 'Envoyer des relances', icon: '✉️', text: 'Envoyer mes relances du jour' },
+    { label: 'Remplir prospection ffaperitif.com', icon: '⚡', text: 'Remplis le formulaire de prospection pour ffaperitif.com' },
+    { label: 'Ajouter prospect Nestlé', icon: '📝', text: 'Remplis le formulaire de prospect pour Nestlé' },
+    { label: 'Voir la Carte GPS', icon: '🗺️', text: 'Navigue vers la carte des prospects' },
+    { label: 'Voir les statistiques', icon: '📊', text: 'Voir mes statistiques CRM' },
   ];
+
+  const handleNavigationOrFormCompletion = (text: string): boolean => {
+    const lowerText = text.toLowerCase();
+    
+    // 1. FORM COMPLETION
+    if (lowerText.includes('remplis') || lowerText.includes('remplir') || lowerText.includes('complète') || lowerText.includes('complete') || lowerText.includes('saisis')) {
+      if (lowerText.includes('prospection') || lowerText.includes('recherche')) {
+        const match = text.match(/(?:pour|le site|de|du site|saisir|saisis)\s+([a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}|[a-zA-Z0-9.-]+)/i);
+        const domain = match ? match[1] : 'ffaperitif.com';
+        
+        setMessages(prev => [...prev, { role: 'assistant', content: `Remplissage automatique du formulaire de prospection pour **${domain}**...` }]);
+        router.push('/prospection');
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('copilote-fill-form', {
+            detail: {
+              page: '/prospection',
+              data: { siteUrl: domain, entryValue: domain }
+            }
+          }));
+        }, 800);
+        return true;
+      }
+
+      if (lowerText.includes('prospect') || lowerText.includes('crm') || lowerText.includes('manuel')) {
+        const match = text.match(/(?:prospect|nommé|nom|l'entreprise|l’entreprise)\s+([a-zA-Z0-9À-ÿ\s'-]+)/i);
+        const name = match ? match[1].trim() : 'Nestlé';
+        
+        setMessages(prev => [...prev, { role: 'assistant', content: `Remplissage automatique du formulaire pour ajouter le prospect **${name}**...` }]);
+        router.push('/prospects');
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('copilote-fill-form', {
+            detail: {
+              page: '/prospects',
+              data: {
+                nom: name,
+                secteur: 'Restauration / Agroalimentaire',
+                ville: 'Paris',
+                adresse: '7 Rue de la Paix',
+                siteWeb: `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}.fr`,
+                email: `contact@${name.toLowerCase().replace(/[^a-z0-9]/g, '')}.fr`,
+                telephone: '0140203040',
+                score: 90
+              }
+            }
+          }));
+        }, 800);
+        return true;
+      }
+    }
+
+    // 2. PAGE NAVIGATION
+    if (lowerText.includes('va sur') || lowerText.includes('aller') || lowerText.includes('redirige') || lowerText.includes('affiche la page') || lowerText.includes('navigue vers') || lowerText.includes('montre')) {
+      let targetPath = '';
+      let pageName = '';
+      if (lowerText.includes('carte') || lowerText.includes('map') || lowerText.includes('gps')) {
+        targetPath = '/carte';
+        pageName = 'la Carte des prospects';
+      } else if (lowerText.includes('prospection') || lowerText.includes('recherche')) {
+        targetPath = '/prospection';
+        pageName = 'la Recherche de prospection';
+      } else if (lowerText.includes('prospect') || lowerText.includes('crm')) {
+        targetPath = '/prospects';
+        pageName = 'la Gestion des prospects';
+      } else if (lowerText.includes('campagne')) {
+        targetPath = '/campagnes';
+        pageName = 'les Campagnes';
+      } else if (lowerText.includes('stat') || lowerText.includes('tableau de bord') || lowerText.includes('dashboard')) {
+        targetPath = '/dashboard';
+        pageName = 'le Tableau de bord';
+      } else if (lowerText.includes('paramètre') || lowerText.includes('settings') || lowerText.includes('intégration')) {
+        targetPath = '/settings';
+        pageName = 'les Paramètres';
+      }
+
+      if (targetPath) {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Naviguons vers **${pageName}**...` }]);
+        router.push(targetPath);
+        return true;
+      }
+    }
+
+    return false;
+  };
 
   const handleSelectSuggestion = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
+    
+    // Try local action first (navigation / form filling)
+    if (handleNavigationOrFormCompletion(text)) {
+      return;
+    }
+
     setLoading(true);
     if (text === 'Lancer une recherche SIRENE') {
       setShowSuggestions(false);
@@ -83,6 +177,12 @@ export default function CopiloteWidget() {
     const userMsg = input.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+
+    // Try local action first (navigation / form filling)
+    if (handleNavigationOrFormCompletion(userMsg)) {
+      return;
+    }
+
     setLoading(true);
 
     try {
