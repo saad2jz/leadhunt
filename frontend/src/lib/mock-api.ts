@@ -1285,7 +1285,7 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
                 : `Bonjour ${firstName},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous proposons ${sectorPitch} pour accompagner les entreprises de votre secteur.\n\nUn échange rapide vous intéresse-t-il ?\n\nBien cordialement,\n[Votre prénom]`
             }
           };
-          };
+        };
 
         // Use SIRENE results if available, otherwise fallback minimal set
         if (sirenResults.length > 0) {
@@ -1323,18 +1323,6 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
             kpis: JSON.stringify(['Taux de réponse', 'RDV qualifiés', 'Cycle de vente', 'Taux de transformation'])
           }
         ];
-
-        // Update the item in the list
-        const idx = searches.findIndex(s => s.id === id);
-        if (idx > -1) {
-          searches[idx] = search;
-          setItems(STORAGE_KEYS.PROSPECTION, searches);
-        }
-      }
-
-      return { success: true, recherche: search };
-
-    }
 
         // Update the item in the list
         const idx = searches.findIndex(s => s.id === id);
