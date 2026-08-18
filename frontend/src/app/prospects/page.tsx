@@ -23,6 +23,18 @@ export default function ProspectsPage() {
   const [contactRole, setContactRole] = useState('Décideur');
   const [addingContact, setAddingContact] = useState(false);
 
+  // Modale pour ajouter un prospect manuel
+  const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+  const [prospectNom, setProspectNom] = useState('');
+  const [prospectSecteur, setProspectSecteur] = useState('');
+  const [prospectVille, setProspectVille] = useState('');
+  const [prospectAdresse, setProspectAdresse] = useState('');
+  const [prospectSiteWeb, setProspectSiteWeb] = useState('');
+  const [prospectEmail, setProspectEmail] = useState('');
+  const [prospectPhone, setProspectPhone] = useState('');
+  const [prospectScore, setProspectScore] = useState<number>(70);
+  const [addingProspect, setAddingProspect] = useState(false);
+
   // Filtres actifs
   const [searchSecteur, setSearchSecteur] = useState('');
   const [searchVille, setSearchVille] = useState('');
@@ -34,6 +46,52 @@ export default function ProspectsPage() {
   const [showSaveViewModal, setShowSaveViewModal] = useState(false);
   const [newViewName, setNewViewName] = useState('');
   const [savingView, setSavingView] = useState(false);
+
+  const handleAddProspect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prospectNom.trim()) return;
+    setAddingProspect(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const res = await fetch('/api/prospects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nom: prospectNom,
+          secteur: prospectSecteur || null,
+          ville: prospectVille || null,
+          adresse: prospectAdresse || null,
+          siteWeb: prospectSiteWeb || null,
+          email: prospectEmail || null,
+          telephone: prospectPhone || null,
+          score: Number(prospectScore),
+        }),
+      });
+
+      if (res.ok) {
+        setShowAddProspectModal(false);
+        setProspectNom('');
+        setProspectSecteur('');
+        setProspectVille('');
+        setProspectAdresse('');
+        setProspectSiteWeb('');
+        setProspectEmail('');
+        setProspectPhone('');
+        setProspectScore(70);
+        setMessage('Prospect ajouté manuellement avec succès.');
+        fetchProspects();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Erreur lors de l\'ajout du prospect.');
+      }
+    } catch (err) {
+      setError('Erreur réseau.');
+    } finally {
+      setAddingProspect(false);
+    }
+  };
 
   useEffect(() => {
     fetchProspects();
@@ -245,6 +303,14 @@ export default function ProspectsPage() {
               <h1 className="text-3xl font-extrabold text-white mt-1">Prospects & Contacts</h1>
               <p className="text-slate-400 text-sm mt-1">Gérez votre pipeline de vente et qualifiez vos décideurs.</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowAddProspectModal(true)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-blue-500/10"
+            >
+              <Plus className="h-4 w-4" />
+              Ajouter un prospect
+            </button>
           </div>
 
           {/* Feedback Messages */}
@@ -579,6 +645,132 @@ export default function ProspectsPage() {
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
                 >
                   {savingView ? 'Sauvegarde...' : 'Sauvegarder'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ajout Prospect Manuel */}
+      {showAddProspectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-white">Ajouter un Prospect Manuellement</h3>
+              <button type="button" onClick={() => setShowAddProspectModal(false)} className="text-slate-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddProspect} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Nom de l'entreprise *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Google France"
+                  value={prospectNom}
+                  onChange={(e) => setProspectNom(e.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Secteur</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Logiciel"
+                    value={prospectSecteur}
+                    onChange={(e) => setProspectSecteur(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Ville</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Paris"
+                    value={prospectVille}
+                    onChange={(e) => setProspectVille(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Adresse</label>
+                <input
+                  type="text"
+                  placeholder="Ex: 8 Rue de Londres, 75009 Paris"
+                  value={prospectAdresse}
+                  onChange={(e) => setProspectAdresse(e.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Téléphone</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 0140000000"
+                    value={prospectPhone}
+                    onChange={(e) => setProspectPhone(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Score Initial (0-100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={prospectScore}
+                    onChange={(e) => setProspectScore(Number(e.target.value))}
+                    className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Email de contact</label>
+                  <input
+                    type="email"
+                    placeholder="Ex: contact@google.fr"
+                    value={prospectEmail}
+                    onChange={(e) => setProspectEmail(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Site Web</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: https://google.fr"
+                    value={prospectSiteWeb}
+                    onChange={(e) => setProspectSiteWeb(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddProspectModal(false)}
+                  className="px-4 py-2 border border-slate-800 rounded-lg text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingProspect}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {addingProspect ? 'Ajout...' : 'Créer le prospect'}
                 </button>
               </div>
             </form>
