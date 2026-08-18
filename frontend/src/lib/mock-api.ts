@@ -964,24 +964,59 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           maxEntitesIA: 5,
         };
       } else {
-        // Fallback générique intelligent basé sur le nom du domaine
+        // Fallback dynamique et sur-mesure pour TOUS les secteurs d'activité
         const label = companyKey.charAt(0).toUpperCase() + companyKey.slice(1);
-        resumeActivite = `${label} est une entreprise proposant des produits ou services à destination de clients professionnels. Son positionnement B2B lui permet de cibler des acheteurs spécialisés dans son domaine d'activité.`;
-        concurrentsIdentifies = [`${companyKey}-concurrent.fr`, `groupe-${companyKey}.com`];
+        
+        // Tentative de déduction de l'activité par le nom du site
+        let guessedSector = 'Services & Solutions Professionnelles';
+        let guessedKeywords = `Entreprises partenaires, Décideurs B2B, Gérants PME, Directions achats`;
+        let targetSecteurs = ['70.22Z', '46.90Z']; // Conseil, Negoce
+        let roles = ['Gérant', 'Directeur Commercial', 'Responsable achats'];
+
+        const ev = kw.toLowerCase();
+        if (/hotel|heberg|gite|camp/i.test(ev)) {
+          guessedSector = 'Hôtellerie & Hébergement Professionnel';
+          guessedKeywords = 'Hôtels indépendants, Châteaux hôtels, Résidences de tourisme, Gîtes professionnels';
+          targetSecteurs = ['55.10Z', '55.20Z'];
+        } else if (/event|salon|foir|semin/i.test(ev)) {
+          guessedSector = 'Événementiel & Organisation de séminaires';
+          guessedKeywords = 'Agences événementielles, Lieux de réception, Organisateurs de salons, Services traiteurs';
+          targetSecteurs = ['82.30Z', '93.29Z'];
+          roles = ['Chef de projet événementiel', 'Responsable communication', 'Gérant'];
+        } else if (/auto|car|moto|garage|vehic/i.test(ev)) {
+          guessedSector = 'Automobile, Mobilité & Flottes de véhicules';
+          guessedKeywords = 'Garages indépendants, Concessionnaires, Flottes de transport, Services auto entreprise';
+          targetSecteurs = ['45.11Z', '45.20A'];
+          roles = ['Gestionnaire de flotte', 'Responsable achats', 'Gérant'];
+        } else if (/immobilier|immo|syndic|agence/i.test(ev)) {
+          guessedSector = 'Immobilier & Gestion de Patrimoine';
+          guessedKeywords = 'Agences immobilières, Promoteurs immobiliers, Syndics de copropriété, Administrateurs de biens';
+          targetSecteurs = ['68.31Z', '68.32A'];
+          roles = ['Directeur d\'agence', 'Responsable de copropriété', 'Gérant'];
+        } else if (/energie|solar|solaire|eolien|elec/i.test(ev)) {
+          guessedSector = 'Énergies renouvelables & Efficacité énergétique';
+          guessedKeywords = 'Installateurs solaires, Bureaux d\'études thermiques, Entreprises électricité, Éco-rénovateurs';
+          targetSecteurs = ['43.22B', '71.12B'];
+          roles = ['Directeur technique', 'Responsable achats', 'Gérant'];
+        }
+
+        resumeActivite = `Entreprise spécialisée dans les solutions et prestations ${guessedSector} sous la marque ${label.toUpperCase()}, ciblant les acteurs B2B de son écosystème pour maximiser leur valeur d'usage.`;
+        concurrentsIdentifies = [`concurrent-${companyKey}.fr`, `groupe-${companyKey}.com`, `alternative-${companyKey}.fr`];
         segmentsProposes = [
-          { nom: 'PME et TPE du même secteur d\'activité', score: 88 },
-          { nom: 'Groupes et ETI régionaux', score: 82 },
-          { nom: 'Revendeurs et distributeurs spécialisés', score: 76 }
+          { nom: `Acteurs cibles du secteur ${guessedSector}`, score: 95 },
+          { nom: 'PME en forte croissance du secteur', score: 88 },
+          { nom: 'ETI et grands comptes partenaires', score: 76 }
         ];
+
         besoinGenere = {
-          solutionType: `Produits & Services ${label}`,
-          tailleMin: 5, tailleMax: 200,
+          solutionType: `${guessedSector} B2B`,
+          tailleMin: 1, tailleMax: 200,
           zonesGeo: ['Toute la France'],
-          secteurs: ['70.22Z', '46.90Z', '74.90B'],
+          secteurs: targetSecteurs,
           budgetType: 'Standard',
           signauxAchat: ['recrutement', 'refonte_site'],
-          rolesDecideurs: ['Gérant', 'Directeur commercial', 'Responsable achats'],
-          motsClesSuggeres: `Entreprises du secteur ${label}, PME régionales en croissance, Dirigeants de TPE, Directeurs commerciaux B2B, Décideurs achats`,
+          rolesDecideurs: roles,
+          motsClesSuggeres: guessedKeywords,
           maxEntitesIA: 5,
         };
       }
@@ -1098,8 +1133,8 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
           const angleText = ANGLES[signal as keyof typeof ANGLES] || signal;
           const source = SOURCES[idx % SOURCES.length];
           const emailDomain = nom.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) + (cp ? `.fr` : '.com');
-          const fitScore = Math.max(75, 95 - idx * 3);
-          const timingScore = Math.max(70, 92 - idx * 4);
+          const fitScore = Math.max(90, 98 - idx * 2);
+          const timingScore = Math.max(89, 96 - idx * 2);
           const canal = signal === 'levees_fonds' ? 'linkedin' : (idx % 2 === 0 ? 'email' : 'linkedin');
 
           return {
@@ -1112,7 +1147,7 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
             ville,
             codePostal: cp,
             fitScore,
-            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: idx < 3 }),
+            fitDetail: JSON.stringify({ secteurMatch: true, geoMatch: true, tailleMatch: true, decideurMatch: true, note: "Score d'affinité optimal : adéquation totale de l'ICP." }),
             timingScore,
             timingDetail: JSON.stringify({ signalDetecte: signal }),
             statutCRM: 'nouveau',
