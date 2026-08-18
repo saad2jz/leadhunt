@@ -201,6 +201,7 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
 
       // 2. Cascade Waterfall décideurs
       const targetRoles = input.besoin.rolesDecideurs.length > 0 ? input.besoin.rolesDecideurs : ['CTO', 'Gérant'];
+      let hasMobile = false;
       
       for (const role of targetRoles) {
         const testName = role === 'Gérant' ? 'Marc Lemaire' : role === 'CTO' ? 'Sarah Dubreuil' : 'Jean Dupont';
@@ -212,6 +213,10 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
           'FR',
           session
         );
+
+        if (enrichResult.telephone && enrichResult.telephoneType === 'mobile') {
+          hasMobile = true;
+        }
 
         const decideur = await prisma.decideurTrouve.create({
           data: {
@@ -250,6 +255,8 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
       const angle = fitScore > 80 ? "Positionnement valeur direct" : "Approche indirecte / Partage de contenu";
       const draft = `Bonjour,\n\nJ'ai remarqué vos récents développements chez ${comp.nom} (notamment sur l'aspect ${comp.signal}).\n\nAu vu de votre croissance, je pense que notre solution de ${input.besoin.solutionType} pourrait accélérer votre productivité.\n\nSeriez-vous ouvert à un échange de 10 min ce jeudi ?\n\nCordialement,\n${session.user.email.split('@')[0]}`;
 
+      const phoneNum = hasMobile;
+
       await prisma.planApproche.create({
         data: {
           organisationId: orgId,
@@ -257,9 +264,11 @@ async function processSearchInBackground(rechercheId: string, input: any, sessio
           canalRecommande: 'email',
           angleAccroche: angle,
           etapesSequence: JSON.stringify([
-            { jour: 0, action: 'Email accroche personnalisé' },
-            { jour: 3, action: 'Ajout LinkedIn + Note' },
-            { jour: 7, action: 'Email relance proposition de valeur' }
+            { jour: 1, action: "Warmup - Visite profil LinkedIn de la cible + Suivi page de l'entreprise" },
+            { jour: 3, action: `Premier Contact - Cold Emailing personnalisé sur l'aspect ${comp.signal || 'développement'}` },
+            { jour: 5, action: "LinkedIn - Demande de connexion avec message court d'accroche" },
+            { jour: 7, action: phoneNum ? "Téléphone (Cold Calling) - Premier appel direct suite à l'email" : "LinkedIn - Relance de courtoisie suite à la demande de connexion" },
+            { jour: 12, action: "Nurturing - Envoi d'une étude de cas client par e-mail" }
           ]),
           messageDraft: draft,
         }

@@ -1415,6 +1415,13 @@ async function handleMockRoute(url: string, init?: RequestInit): Promise<any> {
             planApproche: {
               canalRecommande: canal,
               angleAccroche: `Signal détecté : ${angleText}`,
+              etapesSequence: JSON.stringify([
+                { jour: 1, action: "Warmup - Visite profil LinkedIn de la cible + Suivi page de l'entreprise" },
+                { jour: 3, action: `Premier Contact - Cold Emailing personnalisé sur l'aspect ${angleText}` },
+                { jour: 5, action: "LinkedIn - Demande de connexion avec message court d'accroche" },
+                { jour: 7, action: finalPhone ? "Téléphone (Cold Calling) - Premier appel direct suite à l'email" : "LinkedIn - Relance de courtoisie suite à la demande de connexion" },
+                { jour: 12, action: "Nurturing - Envoi d'une étude de cas client par e-mail" }
+              ]),
               messageDraft: idx === 0
                 ? `Bonjour ${firstN || 'Jean'},\n\nJ'ai remarqué que ${nom} (${ville}) est actuellement en phase de ${angleText}.\n\nJe pense que ${sectorPitch} pourrait grandement intéresser vos équipes.\n\nSeriez-vous disponible pour un échange rapide de 10 minutes cette semaine ?\n\nCordialement,\n[Votre prénom]`
                 : `Bonjour ${firstN || 'Jean'},\n\nSuite à votre récent ${angleText}, je souhaitais contacter ${nom} directement.\n\nNous proposons ${sectorPitch} pour accompagner les entreprises de votre secteur.\n\nUn échange rapide vous intéresse-t-il ?\n\nBien cordialement,\n[Votre prénom]`

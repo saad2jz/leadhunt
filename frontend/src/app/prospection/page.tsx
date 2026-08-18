@@ -718,7 +718,7 @@ export default function ProspectionSearchPage() {
 
                       <div className="space-y-2">
                         <div className="flex justify-between items-center text-xs font-semibold text-slate-300">
-                          <span>Modèle de message (Pitch)</span>
+                          <span>Modèle de message (Cold Email)</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -733,6 +733,44 @@ export default function ProspectionSearchPage() {
                         <pre className="p-4 rounded-xl bg-slate-950 border border-slate-850 font-mono text-xs text-slate-400 whitespace-pre-wrap leading-relaxed">
                           {comp.planApproche?.messageDraft}
                         </pre>
+                      </div>
+
+                      {/* Section : Script de Cold Calling si téléphone mobile disponible */}
+                      {comp.decideurs?.[0]?.telephoneTrouve && (
+                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">📞 Script de Téléphone (Cold Calling)</span>
+                            <span className="text-[10px] text-amber-500/80 font-semibold bg-amber-500/10 px-2 py-0.5 rounded">Mobile vérifié</span>
+                          </div>
+                          <div className="text-xs space-y-2 text-slate-300">
+                            <p><strong className="text-amber-400">1. L'Accroche :</strong> "Bonjour {comp.decideurs[0].nom.split(' ')[0]}, Jean de LeadHunt. Je vous appelle car j'ai vu que {comp.nom} est en pleine phase de {comp.planApproche?.angleAccroche?.toLowerCase() || 'développement'}..."</p>
+                            <p><strong className="text-amber-400">2. La Valeur :</strong> "On aide les entreprises de votre secteur à résoudre ce problème en automatisant la cascade d'enrichissement B2B. En moyenne, nos clients doublent leur pipeline."</p>
+                            <p><strong className="text-amber-400">3. L'Engagement :</strong> "Est-ce que vous auriez 10 minutes ce jeudi à 14h pour que je vous montre comment appliquer ça à vos équipes ?"</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Section : Warmup & Délivrabilité e-mails */}
+                      <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-2 text-xs">
+                        <span className="font-bold text-blue-400 block">🛡️ Warm-up & Délivrabilité de votre Domaine</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-400">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Configuration Technique</span>
+                            <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                              <li>SPF, DKIM, DMARC configurés à 100%.</li>
+                              <li>Domaine de redirection de tracking personnalisé.</li>
+                              <li>Chauffage actif depuis 14 jours minimum.</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Bonnes Pratiques</span>
+                            <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                              <li>Max 30 e-mails envoyés par jour par boîte.</li>
+                              <li>Taux de bounce cible inférieur à 3% (Waterfall validé).</li>
+                              <li>70% de personnalisation par IA par e-mail.</li>
+                            </ul>
+                          </div>
+                        </div>
                       </div>
 
                     </div>
