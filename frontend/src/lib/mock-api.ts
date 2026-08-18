@@ -16,6 +16,9 @@ const STORAGE_KEYS = {
   LEADS: 'leadhunt_mock_leads',
   INTERACTIONS: 'leadhunt_mock_interactions',
   ORGANISATIONS: 'leadhunt_mock_organisations',
+  CAMPAGNES: 'leadhunt_mock_campagnes',
+  ETAPES: 'leadhunt_mock_etapes',
+  PROSPECT_CAMPAGNE: 'leadhunt_mock_prospect_campagnes',
 };
 
 // Seed initial data if localStorage is empty
@@ -288,6 +291,33 @@ function seedDatabase() {
         { id: 'u2', email: 'bruce@wayne.example.com', role: 'Manager' }
       ]
     }
+  ]);
+
+  // Seed Campagnes
+  getOrSet(STORAGE_KEYS.CAMPAGNES, [
+    {
+      id: 'c1',
+      nom: 'Campagne IDF Logiciels',
+      description: 'Campagne de prospection ciblée sur les éditeurs de logiciels en Île-de-France.',
+      createdAt: new Date().toISOString(),
+    }
+  ]);
+
+  // Seed Etapes
+  getOrSet(STORAGE_KEYS.ETAPES, [
+    { id: 'e1', campagneId: 'c1', nom: 'Qualification', ordre: 0, couleur: '#94a3b8' },
+    { id: 'e2', campagneId: 'c1', nom: 'Premier contact', ordre: 1, couleur: '#60a5fa' },
+    { id: 'e3', campagneId: 'c1', nom: 'Relance', ordre: 2, couleur: '#f59e0b' },
+    { id: 'e4', campagneId: 'c1', nom: 'RDV pris', ordre: 3, couleur: '#a855f7' },
+    { id: 'e5', campagneId: 'c1', nom: 'Closing / Gagné', ordre: 4, couleur: '#10b981' },
+    { id: 'e6', campagneId: 'c1', nom: 'Perdu', ordre: 5, couleur: '#ef4444' }
+  ]);
+
+  // Seed ProspectCampagne
+  getOrSet(STORAGE_KEYS.PROSPECT_CAMPAGNE, [
+    { id: 'pc1', campagneId: 'c1', prospectId: 'p1', etapeId: 'e2', dateEntreeEtape: new Date().toISOString() },
+    { id: 'pc2', campagneId: 'c1', prospectId: 'p2', etapeId: 'e1', dateEntreeEtape: new Date().toISOString() },
+    { id: 'pc3', campagneId: 'c1', prospectId: 'p3', etapeId: 'e4', dateEntreeEtape: new Date().toISOString() }
   ]);
 }
 
@@ -590,6 +620,101 @@ function handleMockRoute(url: string, init?: RequestInit): any {
       return { success: true, prospects };
     }
 
+    case 'campagnes': {
+      const campaigns = getItems(STORAGE_KEYS.CAMPAGNES);
+      const stages = getItems(STORAGE_KEYS.ETAPES);
+      const links = getItems(STORAGE_KEYS.PROSPECT_CAMPAGNE);
+
+      if (method === 'POST') {
+        const newCamp = {
+          id: 'c_' + Date.now(),
+          nom: body.nom.trim(),
+          description: body.description ? body.description.trim() : '',
+          createdAt: new Date().toISOString(),
+        };
+        campaigns.unshift(newCamp);
+        setItems(STORAGE_KEYS.CAMPAGNES, campaigns);
+
+        // Add default steps
+        const defaultEtapes = [
+          { id: 'e_' + Date.now() + '_0', campagneId: newCamp.id, nom: 'Qualification', ordre: 0, couleur: '#94a3b8' },
+          { id: 'e_' + Date.now() + '_1', campagneId: newCamp.id, nom: 'Premier contact', ordre: 1, couleur: '#60a5fa' },
+          { id: 'e_' + Date.now() + '_2', campagneId: newCamp.id, nom: 'Relance', ordre: 2, couleur: '#f59e0b' },
+          { id: 'e_' + Date.now() + '_3', campagneId: newCamp.id, nom: 'RDV pris', ordre: 3, couleur: '#a855f7' },
+          { id: 'e_' + Date.now() + '_4', campagneId: newCamp.id, nom: 'Closing / Gagné', ordre: 4, couleur: '#10b981' },
+          { id: 'e_' + Date.now() + '_5', campagneId: newCamp.id, nom: 'Perdu', ordre: 5, couleur: '#ef4444' }
+        ];
+        stages.push(...defaultEtapes);
+        setItems(STORAGE_KEYS.ETAPES, stages);
+
+        return { success: true, campagne: { ...newCamp, etapes: defaultEtapes, prospects: [] } };
+      }
+
+      // Populate GET response
+      const populated = campaigns.map(c => {
+        const cStages = stages.filter(s => s.campagneId === c.id).sort((a, b) => a.ordre - b.ordre);
+        const cLinks = links.filter(l => l.campagneId === c.id);
+        return {
+          ...c,
+          etapes: cStages,
+          prospects: cLinks,
+        };
+      });
+
+      return { success: true, campagnes: populated };
+    }
+
+    case 'campagnes/prospects': {
+      const links = getItems(STORAGE_KEYS.PROSPECT_CAMPAGNE);
+      const stages = getItems(STORAGE_KEYS.ETAPES);
+      const { campagneId, prospectIds } = body;
+
+      const firstStage = stages.find(s => s.campagneId === campagneId && s.ordre === 0);
+      if (!firstStage) return { error: 'Première étape introuvable' };
+
+      let addedCount = 0;
+      prospectIds.forEach((pId: string) => {
+        const exists = links.some(l => l.campagneId === campagneId && l.prospectId === pId);
+        if (!exists) {
+          links.push({
+            id: 'pc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            campagneId,
+            prospectId: pId,
+            etapeId: firstStage.id,
+            dateEntreeEtape: new Date().toISOString(),
+          });
+          addedCount++;
+        }
+      });
+
+      setItems(STORAGE_KEYS.PROSPECT_CAMPAGNE, links);
+      return { success: true, count: addedCount, message: `${addedCount} prospect(s) ajouté(s).` };
+    }
+
+    case 'campagnes/drag-and-drop': {
+      const links = getItems(STORAGE_KEYS.PROSPECT_CAMPAGNE);
+      const index = links.findIndex(l => l.id === body.prospectCampagneId);
+      if (index > -1) {
+        links[index].etapeId = body.toEtapeId;
+        links[index].dateEntreeEtape = new Date().toISOString();
+        setItems(STORAGE_KEYS.PROSPECT_CAMPAGNE, links);
+        return { success: true, prospectCampagne: links[index] };
+      }
+      return { error: 'Liaison introuvable' };
+    }
+
+    case 'campagnes/relance': {
+      const links = getItems(STORAGE_KEYS.PROSPECT_CAMPAGNE);
+      const index = links.findIndex(l => l.id === body.prospectCampagneId);
+      if (index > -1) {
+        links[index].relanceProgrammee = body.relanceProgrammee;
+        links[index].notes = body.notes;
+        setItems(STORAGE_KEYS.PROSPECT_CAMPAGNE, links);
+        return { success: true, prospectCampagne: links[index] };
+      }
+      return { error: 'Liaison introuvable' };
+    }
+
     case 'views': {
       const vues = getItems(STORAGE_KEYS.VIEWS);
       if (method === 'POST') {
@@ -694,6 +819,65 @@ function handleMockRoute(url: string, init?: RequestInit): any {
     }
 
     default: {
+      // Handle dynamic routes like campagnes/:id
+      if (path.startsWith('campagnes/')) {
+        const parts = path.split('/');
+        const id = parts[1];
+        const campaigns = getItems(STORAGE_KEYS.CAMPAGNES);
+        const stages = getItems(STORAGE_KEYS.ETAPES);
+        const links = getItems(STORAGE_KEYS.PROSPECT_CAMPAGNE);
+        const prospects = getItems(STORAGE_KEYS.PROSPECTS);
+
+        if (method === 'DELETE') {
+          const filtered = campaigns.filter(c => c.id !== id);
+          setItems(STORAGE_KEYS.CAMPAGNES, filtered);
+          return { success: true };
+        } else if (method === 'PUT' || method === 'PATCH') {
+          const index = campaigns.findIndex(c => c.id === id);
+          if (index > -1) {
+            campaigns[index] = { ...campaigns[index], ...body };
+            setItems(STORAGE_KEYS.CAMPAGNES, campaigns);
+            return { success: true, campagne: campaigns[index] };
+          }
+        } else if (method === 'GET') {
+          const campagne = campaigns.find(c => c.id === id);
+          if (campagne) {
+            const cStages = stages.filter(s => s.campagneId === id).sort((a, b) => a.ordre - b.ordre);
+            const populatedStages = cStages.map(s => {
+              const sLinks = links.filter(l => l.etapeId === s.id);
+              const populatedProspects = sLinks.map(l => {
+                const p = prospects.find(p => p.id === l.prospectId);
+                return {
+                  id: l.id,
+                  campagneId: l.campagneId,
+                  prospectId: l.prospectId,
+                  etapeId: l.etapeId,
+                  dateEntreeEtape: l.dateEntreeEtape,
+                  relanceProgrammee: l.relanceProgrammee,
+                  notes: l.notes,
+                  prospect: p ? {
+                    contacts: [],
+                    ...p
+                  } : null
+                };
+              });
+              return {
+                ...s,
+                prospects: populatedProspects
+              };
+            });
+
+            return {
+              success: true,
+              campagne: {
+                ...campagne,
+                etapes: populatedStages
+              }
+            };
+          }
+        }
+      }
+
       // Handle dynamic routes like prospects/:id
       if (path.startsWith('prospects/')) {
         const parts = path.split('/');
