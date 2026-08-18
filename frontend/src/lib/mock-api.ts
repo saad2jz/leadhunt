@@ -726,6 +726,68 @@ function handleMockRoute(url: string, init?: RequestInit): any {
       return { success: true, vues };
     }
 
+    case 'icp/decouvrir': {
+      const siteUrl = body.siteUrl || 'https://luko.eu';
+      const host = siteUrl.replace('https://', '').replace('http://', '').replace('www.', '').split('/')[0];
+      const companyKey = host.split('.')[0] || 'entreprise';
+
+      let resumeActivite = '';
+      let concurrentsIdentifies: string[] = [];
+      let segmentsProposes: any[] = [];
+      let besoinGenere: any = {};
+
+      if (companyKey.includes('luko') || companyKey.includes('alan') || companyKey.includes('insurance')) {
+        resumeActivite = "Plateforme d'assurance digitale B2B et B2C, simplifiant la couverture des risques professionnels, de santé et d'habitation avec une expérience utilisateur fluide.";
+        concurrentsIdentifies = ['wakam.com', 'seyna.eu', 'yolo-insurance.com'];
+        segmentsProposes = [
+          { nom: 'Courtiers en assurance indépendants', score: 92 },
+          { nom: 'Agences immobilières et syndics', score: 85 },
+          { nom: 'Startups et PME de services', score: 78 }
+        ];
+        besoinGenere = {
+          solutionType: 'Assurance & Prévoyance B2B',
+          tailleMin: 10,
+          tailleMax: 250,
+          zonesGeo: ['Île-de-France', 'Auvergne-Rhône-Alpes'],
+          secteurs: ['Logiciel', 'Assurance'],
+          budgetType: 'Moyen',
+          signauxAchat: ['recrutement', 'levees_fonds'],
+          rolesDecideurs: ['Gérant', 'CTO', 'Responsable achats'],
+          maxEntitesIA: 5,
+        };
+      } else {
+        resumeActivite = `Solution technologique innovante développée par ${companyKey.toUpperCase()} pour optimiser les processus métiers B2B et accélérer la transformation digitale.`;
+        concurrentsIdentifies = [`direct-${companyKey}.com`, `alliance-${companyKey}.fr`];
+        segmentsProposes = [
+          { nom: 'Sociétés de conseil et ESN', score: 88 },
+          { nom: 'Agences de communication et marketing', score: 82 }
+        ];
+        besoinGenere = {
+          solutionType: 'Outils SaaS / Conseil B2B',
+          tailleMin: 10,
+          tailleMax: 100,
+          zonesGeo: ['Toute la France'],
+          secteurs: ['Logiciel'],
+          budgetType: 'Moyen',
+          signauxAchat: ['recrutement', 'refonte_site'],
+          rolesDecideurs: ['Directeur technique', 'CTO', 'Gérant'],
+          maxEntitesIA: 5,
+        };
+      }
+
+      return {
+        success: true,
+        icp: {
+          id: 'icp_' + Date.now(),
+          domaineAnalyse: siteUrl,
+          resumeActivite,
+          concurrentsIdentifies,
+          segmentsProposes,
+          besoinGenere
+        }
+      };
+    }
+
     case 'campagnes/relance/du-jour': {
       const relances = getItems(STORAGE_KEYS.CAMPAIGN_RELANCES);
       return { success: true, relances };
