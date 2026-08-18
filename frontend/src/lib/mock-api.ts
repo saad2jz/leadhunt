@@ -50,6 +50,26 @@ function seedDatabase() {
     console.error('Error during prospects migration:', e);
   }
 
+  // Data validation migration: clear relances and subscription if they are stored in the old formats
+  try {
+    const existingSub = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
+    if (existingSub) {
+      const parsed = JSON.parse(existingSub);
+      if (parsed && !Array.isArray(parsed.usages)) {
+        localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
+      }
+    }
+    const existingRel = localStorage.getItem(STORAGE_KEYS.CAMPAIGN_RELANCES);
+    if (existingRel) {
+      const parsed = JSON.parse(existingRel);
+      if (Array.isArray(parsed) && parsed.length > 0 && !parsed[0].prospect) {
+        localStorage.removeItem(STORAGE_KEYS.CAMPAIGN_RELANCES);
+      }
+    }
+  } catch (e) {
+    console.error('Error during data validation migration:', e);
+  }
+
   // Seed Prospects
   getOrSet(STORAGE_KEYS.PROSPECTS, [
     {
@@ -118,25 +138,33 @@ function seedDatabase() {
   getOrSet(STORAGE_KEYS.CAMPAIGN_RELANCES, [
     {
       id: 'r1',
-      prospectId: 'p1',
-      prospectNom: 'Acme Corp',
+      relanceProgrammee: new Date().toISOString(),
       canal: 'Téléphone',
       statut: 'A faire',
-      relanceProgrammee: new Date().toISOString(),
-      etape: 1,
-      campagneId: 'c1',
-      campagneNom: 'Campagne IDF Logiciels',
+      etape: { id: 'e1', nom: 'Premier contact' },
+      campagne: { id: 'c1', nom: 'Campagne IDF Logiciels' },
+      prospect: {
+        id: 'p1',
+        nom: 'Acme Corp',
+        contacts: [
+          { id: 'ct1', nom: 'Alice Martin', fonction: 'Directrice Commerciale' }
+        ]
+      }
     },
     {
       id: 'r2',
-      prospectId: 'p2',
-      prospectNom: 'Stark Industries',
+      relanceProgrammee: new Date().toISOString(),
       canal: 'Email',
       statut: 'A faire',
-      relanceProgrammee: new Date().toISOString(),
-      etape: 2,
-      campagneId: 'c1',
-      campagneNom: 'Campagne IDF Logiciels',
+      etape: { id: 'e2', nom: 'Relance 1' },
+      campagne: { id: 'c1', nom: 'Campagne IDF Logiciels' },
+      prospect: {
+        id: 'p2',
+        nom: 'Stark Industries',
+        contacts: [
+          { id: 'ct2', nom: 'Pepper Potts', fonction: 'CEO' }
+        ]
+      }
     }
   ]);
 
@@ -162,15 +190,38 @@ function seedDatabase() {
     { id: 'v2', nom: 'Secteur Tech / Score > 80', filtres: { scoreGte: 80, secteur: 'Logiciel' } }
   ]);
 
-  // Seed Subscription limit metrics
+  // Seed Subscription limit metrics matching the db schema array format
   getOrSet(STORAGE_KEYS.SUBSCRIPTION, {
-    plan: 'Starter',
-    usages: {
-      prospects: { count: 3, limit: 50 },
-      emails: { count: 12, limit: 100 },
-      appels: { count: 5, limit: 50 },
-      iaCredits: { count: 25, limit: 200 }
-    }
+    usages: [
+      {
+        id: 'mock-sirene',
+        apiName: 'Recherches Sirene',
+        count: 3,
+        limit: 50,
+        resetAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
+      },
+      {
+        id: 'mock-enrichment',
+        apiName: 'Enrichissements Waterfall',
+        count: 12,
+        limit: 100,
+        resetAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
+      },
+      {
+        id: 'mock-calls',
+        apiName: 'Appels Téléphoniques',
+        count: 5,
+        limit: 50,
+        resetAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
+      },
+      {
+        id: 'mock-ia',
+        apiName: 'Crédits IA Copilote',
+        count: 25,
+        limit: 200,
+        resetAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
+      }
+    ]
   });
 
   // Seed Email Templates
