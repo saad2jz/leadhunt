@@ -462,6 +462,94 @@ function handleMockRoute(url: string, init?: RequestInit): any {
       };
     }
 
+    case 'entreprises/search': {
+      const q = queryParams.get('q') || '';
+      return {
+        results: [
+          {
+            siren: '123456789',
+            nom: `${q} Solutions`,
+            formeJuridique: 'SAS',
+            adresse: '12 Rue de l\'Innovation, Paris',
+            codeNaf: '6201Z',
+            libelleSecteur: 'Édition de logiciels',
+            dirigeantNom: 'Jean Dupont',
+            dirigeantRole: 'Président',
+            trancheEffectif: '20 à 49 salariés'
+          },
+          {
+            siren: '987654321',
+            nom: `${q} Corporation`,
+            formeJuridique: 'SA',
+            adresse: '45 Avenue de la Technologie, Lyon',
+            codeNaf: '5829C',
+            libelleSecteur: 'Services informatiques',
+            dirigeantNom: 'Marc Martin',
+            dirigeantRole: 'Directeur Général',
+            trancheEffectif: '100 à 199 salariés'
+          }
+        ]
+      };
+    }
+
+    case 'prospects/import': {
+      const prospects = getItems(STORAGE_KEYS.PROSPECTS);
+      const companies = body.companies || [];
+      companies.forEach((c: any) => {
+        if (!prospects.some(p => p.id === c.siren)) {
+          prospects.unshift({
+            id: c.siren,
+            nom: c.nom,
+            adresse: c.adresse,
+            ville: c.adresse?.split(',')[1]?.trim() || 'Paris',
+            secteur: c.libelleSecteur,
+            taille: c.trancheEffectif,
+            statut: 'À appeler',
+            score: 75,
+            telephone: '0100000000',
+            telephoneVerifie: true,
+            email: `contact@${c.nom.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+            emailVerifie: true,
+            contacts: [
+              { id: 'ct_' + Date.now(), nom: c.dirigeantNom, fonction: c.dirigeantRole }
+            ],
+            createdAt: new Date().toISOString()
+          });
+        }
+      });
+      setItems(STORAGE_KEYS.PROSPECTS, prospects);
+      return { success: true, importedCount: companies.length };
+    }
+
+    case 'prospects/inscrire-sequence': {
+      return { success: true };
+    }
+
+    case 'emails/envoyer': {
+      return { success: true };
+    }
+
+    case 'ia/analyser': {
+      return { success: true, analyse: 'Analyse IA générée avec succès pour ce prospect.' };
+    }
+
+    case 'signaux/verifier': {
+      return { success: true, signaux: [] };
+    }
+
+    case 'crm/sync': {
+      const logs = getItems(STORAGE_KEYS.CRM_LOGS);
+      logs.unshift({
+        id: 'log_' + Date.now(),
+        date: new Date().toISOString(),
+        type: 'sync',
+        status: 'success',
+        message: 'Synchronisation manuelle réussie'
+      });
+      setItems(STORAGE_KEYS.CRM_LOGS, logs);
+      return { success: true };
+    }
+
     case 'prospects': {
       const prospects = getItems(STORAGE_KEYS.PROSPECTS);
       if (method === 'POST') {
